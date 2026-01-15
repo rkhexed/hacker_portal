@@ -1,26 +1,73 @@
 import { useState, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = "http://localhost:8080";
 
-export default function ProtectedRoute({ children }) {
-  const [user, setUser] = useState(null);
+export default function ProtectedRoute({ children, requireApplication = true }) {
+  const { user: authUser, session } = useAuth();
+  const location = useLocation();
+  const [applicationUser, setApplicationUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  // For now, using test user email - replace with auth context
-  const userEmail = "test.hacker@casehacks.ca";
+  const [userNotFound, setUserNotFound] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`)
-      .then(res => res.json())
-      .then(data => {
-        setUser(data.user);
-        setLoading(false);
+    if (session && authUser) {
+      fetch(`${API_URL}/api/user/email/${encodeURIComponent(authUser.email)}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       })
-      .catch(err => {
-        console.error("Error fetching user:", err);
-        setLoading(false);
-      });
-  }, []);
+        .then(res => {
+          if (res.status === 404 || !res.ok) {
+            setUserNotFound(true);
+            setLoading(false);
+            return null;
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (data) {
+            setApplicationUser(data.user);
+          }
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Error fetching user:", err);
+          setUserNotFound(true);
+          setLoading(false);
+        });
+    } else if (!session) {
+      setLoading(false);
+    }
+  }, [session, authUser]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/login" />;
+  }
+
+  // If user doesn't exist in users table, redirect to application
+  if (userNotFound && location.pathname !== '/application') {
+    return <Navigate to="/application" />;
+  }
+
+  // If on application page and requireApplication is false, allow access
+  if (!requireApplication) {
+    return children;
+  }
+
+  // If user hasn't applied yet (no status field), redirect to application
+  if (applicationUser && !applicationUser.status && location.pathname !== '/application') {
+    return <Navigate to="/application" />;
+  }
 
   // Get application status styling
   const getStatusStyle = (status) => {
@@ -49,16 +96,8 @@ export default function ProtectedRoute({ children }) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>
-      </div>
-    );
-  }
-
   // Show placeholder page if user is not accepted
-  if (!user || user.status !== 'accepted') {
+  if (!applicationUser || applicationUser.status !== 'accepted') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div 
@@ -72,30 +111,30 @@ export default function ProtectedRoute({ children }) {
             className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl"
             style={{ backgroundColor: 'var(--button)' }}
           >
-            {(!user || user.status === 'pending') && '⏳'}
-            {user?.status === 'waitlisted' && '📋'}
-            {user?.status === 'rejected' && '😔'}
+            {(!applicationUser || applicationUser.status === 'pending') && '⏳'}
+            {applicationUser?.status === 'waitlisted' && '📋'}
+            {applicationUser?.status === 'rejected' && '😔'}
           </div>
           
           <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>
-            {(!user || user.status === 'pending') && 'Application Under Review'}
-            {user?.status === 'waitlisted' && "You're on the Waitlist"}
-            {user?.status === 'rejected' && 'Application Not Accepted'}
+            {(!applicationUser || applicationUser.status === 'pending') && 'Application Under Review'}
+            {applicationUser?.status === 'waitlisted' && "You're on the Waitlist"}
+            {applicationUser?.status === 'rejected' && 'Application Not Accepted'}
           </h1>
           
           <p className="mb-6" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
-            {(!user || user.status === 'pending') && "Thanks for applying to CaseHacks! We're reviewing your application and will get back to you soon."}
-            {user?.status === 'waitlisted' && "You're on our waitlist. We'll notify you if a spot opens up!"}
-            {user?.status === 'rejected' && "Unfortunately, we weren't able to accept your application this time. We hope to see you at future events!"}
+            {(!applicationUser || applicationUser.status === 'pending') && "Thanks for applying to CaseHacks! We're reviewing your application and will get back to you soon."}
+            {applicationUser?.status === 'waitlisted' && "You're on our waitlist. We'll notify you if a spot opens up!"}
+            {applicationUser?.status === 'rejected' && "Unfortunately, we weren't able to accept your application this time. We hope to see you at future events!"}
           </p>
           
           <div 
-            className={`inline-block px-4 py-2 rounded-full text-sm font-medium border ${getStatusStyle(user?.status)}`}
+            className={`inline-block px-4 py-2 rounded-full text-sm font-medium border ${getStatusStyle(applicationUser?.status)}`}
           >
-            {getStatusText(user?.status)}
+            {getStatusText(applicationUser?.status)}
           </div>
           
-          {(!user || user.status === 'pending') && (
+          {(!applicationUser || applicationUser.status === 'pending') && (
             <p className="mt-6 text-sm" style={{ color: 'var(--foreground)', opacity: 0.5 }}>
               Check back later for updates on your application status.
             </p>

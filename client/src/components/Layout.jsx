@@ -1,10 +1,12 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, User, Users, Menu } from 'lucide-react';
+import { LayoutDashboard, Calendar, User, Users, Menu, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { signOut } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -48,11 +50,18 @@ export default function Layout() {
               })}
             </div>
 
-            {/* User Avatar */}
+            {/* User Avatar & Sign Out */}
             <div className="hidden md:flex items-center space-x-3">
               <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-sm font-medium">
                 H
               </div>
+              <button
+                onClick={signOut}
+                className="flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors text-[var(--foreground)]/70 hover:text-[var(--primary)] hover:bg-[var(--button)]/50"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </button>
             </div>
 
             {/* Mobile Menu Button */}
@@ -88,6 +97,13 @@ export default function Layout() {
                 </Link>
               );
             })}
+            <button
+              onClick={() => { signOut(); setIsMobileMenuOpen(false); }}
+              className="w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors text-[var(--foreground)]/70 hover:text-[var(--primary)] hover:bg-[var(--button)]/50"
+            >
+              <LogOut className="w-4 h-4 mr-3" />
+              Sign Out
+            </button>
           </div>
         )}
       </nav>

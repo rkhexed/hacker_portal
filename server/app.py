@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase_client import supabase
+from auth import token_required
 
 app = Flask(__name__)
 CORS(app)
@@ -20,7 +21,38 @@ def get_events():
         return jsonify({"error": str(e)}), 500
 
 # ==================== USER ====================
+@app.route("/api/user", methods=["POST"])
+@token_required
+def create_user():
+    """Create a new user record without status (user hasn't applied yet)"""
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        name = data.get("name")
+        user_id = data.get("id")
+        
+        if not email or not name or not user_id:
+            return jsonify({"error": "Email, name, and id are required"}), 400
+        
+        # Check if user already exists
+        existing = supabase.table("users").select("id").eq("email", email).execute()
+        if existing.data and len(existing.data) > 0:
+            return jsonify({"user": existing.data[0]}), 200
+        
+        # Create new user without status (null) - they haven't applied yet
+        response = supabase.table("users").insert({
+            "id": user_id,
+            "email": email,
+            "name": name,
+            "status": None  # No status until they submit application
+        }).execute()
+        
+        return jsonify({"user": response.data[0]}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/user/<user_id>", methods=["GET"])
+@token_required
 def get_user(user_id):
     """Get user details by ID"""
     try:
@@ -30,6 +62,7 @@ def get_user(user_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/user/<user_id>", methods=["PUT"])
+@token_required
 def update_user(user_id):
     """Update user profile"""
     try:
@@ -44,6 +77,7 @@ def update_user(user_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/user/email/<email>", methods=["GET"])
+@token_required
 def get_user_by_email(email):
     """Get user details by email (includes status)"""
     try:
@@ -53,6 +87,7 @@ def get_user_by_email(email):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/user/<user_id>/points", methods=["POST"])
+@token_required
 def add_points(user_id):
     """Add points to a user"""
     try:
@@ -82,6 +117,7 @@ def get_teams():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/teams", methods=["POST"])
+@token_required
 def create_team():
     """Create a new team and add creator as member"""
     try:
@@ -135,6 +171,7 @@ def get_team(team_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/team/<team_id>", methods=["PUT"])
+@token_required
 def update_team(team_id):
     """Update team details"""
     try:
@@ -169,6 +206,7 @@ def get_user_checkins(user_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/checkin", methods=["POST"])
+@token_required
 def create_checkin():
     """Create a check-in for an event"""
     try:
@@ -193,6 +231,74 @@ def get_application_status(email):
     try:
         response = supabase.table("applications").select("id, email, name, status, created_at").eq("email", email).single().execute()
         return jsonify({"application": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== APPLICATION QUESTIONS ====================
+@app.route("/api/application-questions", methods=["GET"])
+def get_application_questions():
+    """Get all application questions ordered by sort_order"""
+    try:
+        response = supabase.table("application_questions").select("*").order("sort_order").execute()
+        return jsonify({"questions": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/application/submit", methods=["POST"])
+@token_required
+def submit_application():
+    """Submit application with answers and update user status"""
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        name = data.get("name")
+        answers = data.get("answers", {})
+        
+        if not email or not name:
+            return jsonify({"error": "Email and name are required"}), 400
+        
+        # Fetch all questions to get field_key mappings
+        questions_response = supabase.table("application_questions").select("id, field_key").execute()
+        question_map = {q["id"]: q["field_key"] for q in questions_response.data}
+        
+        # Create application record
+        app_response = supabase.table("applications").insert({
+            "email": email,
+            "name": name,
+            "status": "pending"
+        }).execute()
+        
+        if not app_response.data or len(app_response.data) == 0:
+            return jsonify({"error": "Failed to create application"}), 500
+        
+        application_id = app_response.data[0]["id"]
+        
+        # Create answer records and collect profile field mappings
+        answer_records = []
+        profile_updates = {}
+        
+        for question_id, answer_text in answers.items():
+            answer_records.append({
+                "application_id": application_id,
+                "question_id": question_id,
+                "answer_text": answer_text
+            })
+            
+            # If this question has a field_key, map it to user profile
+            field_key = question_map.get(question_id)
+            if field_key:
+                profile_updates[field_key] = answer_text
+        
+        if answer_records:
+            supabase.table("application_answers").insert(answer_records).execute()
+        
+        # Update user status and profile fields in users table
+        user_update = {"status": "pending"}
+        user_update.update(profile_updates)
+        
+        supabase.table("users").update(user_update).eq("email", email).execute()
+        
+        return jsonify({"application": app_response.data[0]}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
