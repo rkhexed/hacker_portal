@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, ExternalLink, Bell, Users, CheckCircle, Trophy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = "http://localhost:8080";
 
@@ -12,13 +13,18 @@ export default function Dashboard() {
   const [team, setTeam] = useState(null);
   const [checkins, setCheckins] = useState([]);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const { session } = useAuth();
   
   // For now, using test user email - replace with auth context
   const userEmail = "test.hacker@casehacks.ca";
 
   useEffect(() => {
     // Fetch user data (including QR code, team, and status)
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`)
+    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
       .then(res => res.json())
       .then(data => {
         setUser(data.user);
@@ -198,9 +204,9 @@ export default function Dashboard() {
           <div 
             className="p-4 rounded-lg mb-4 bg-white"
           >
-            {user?.qr_code ? (
+            {user?.id ? (
               <QRCodeSVG 
-                value={user.qr_code} 
+                value={user.id} 
                 size={96}
                 level="M"
                 fgColor="#8571b6"
