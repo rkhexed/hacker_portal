@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, User, Users, Menu, LogOut } from 'lucide-react';
+import { LayoutDashboard, Calendar, User, Users, Menu, LogOut, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Schedule', href: '/schedule', icon: Calendar },
     { name: 'Teams', href: '/teams', icon: Users },
+    { name: 'Scan', href: '/scan', icon: QrCode },
     { name: 'Profile', href: '/profile', icon: User },
   ];
 

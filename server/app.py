@@ -301,6 +301,41 @@ def submit_application():
         return jsonify({"application": app_response.data[0]}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+# ==================== SCAN ====================
+@app.route("/api/scan/<scanner_id>", methods=["POST"])
+def submit_hacker_to_hacker_scan(scanner_id):
+    """Submit table entry for a hacker to scan the qr code of another hacker with answers and update user status"""
+    try:
+        data = request.get_json()
+        original_user_id = data.get("original_user_id")
+        
+        if not original_user_id or not scanner_id:
+            return jsonify({"error": "Original user ID and scanner ID are required"}), 400
+        
+        # Create hacker to hacker scan record
+        app_response = supabase.table("hacker_to_hacker_scans").insert({
+            "original_user_id": original_user_id,
+            "scanner_id": scanner_id,
+        }).execute()
+        
+        if not app_response.data or len(app_response.data) == 0:
+            return jsonify({"error": "Failed to create hacker to hacker scan record"}), 500
+
+        # Get scanner's name for success message
+        scanner = supabase.table("users").select("name").eq("id", scanner_id).single().execute()
+        user_name = scanner.data.get("name", "User") if scanner.data else "User"
+
+        return jsonify({
+            "success": True,
+            "userName": user_name,
+            "scan": app_response.data[0]
+        }), 201
+    except Exception as e:
+        # Handle unique constraint violation
+        if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            return jsonify({"error": "You have already scanned this user"}), 409
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

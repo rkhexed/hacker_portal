@@ -6,6 +6,7 @@ import Schedule from './pages/Schedule';
 import Profile from './pages/Profile';
 import Teams from './pages/Teams';
 import Auth from './pages/Auth';
+import Scan from './pages/Scan';
 import Application from './pages/Application';
 
 function App() {
@@ -37,6 +38,11 @@ function App() {
           <Route path="teams" element={
             <ProtectedRoute>
               <Teams />
+            </ProtectedRoute>
+          } />
+          <Route path="scan" element={
+            <ProtectedRoute>
+              <Scan />
             </ProtectedRoute>
           } />
         </Route>
