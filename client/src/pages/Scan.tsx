@@ -10,7 +10,7 @@ export default function ScanPage() {
 
   // For now, using test user email - replace with auth context
   const userEmail = "test.hacker@casehacks.ca";
-  const userId = "3ede014b-16f9-4728-abf7-1fbf7df55b07"; // Replace with actual user ID from auth context
+  const userId = "09702fd8-9dab-4a86-8211-8b041d290a77"; // Replace with actual user ID from auth context
 
   const handleScan = async (detectedCodes: any[]) => {
     if (!scanning || detectedCodes.length === 0) return;
@@ -67,6 +67,26 @@ export default function ScanPage() {
       return { 
         success: false, 
         error: 'Empty response from server' 
+      };
+    }
+
+    // If succesful, send API request to update points
+    const pointsResponse = await fetch(`${API_URL}/api/user/${userId}/points`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_interaction_points: 10 // Replace with actual points value
+      }),
+    });
+
+    if (!pointsResponse.ok) {
+      const text = await pointsResponse.text();
+      console.error('Points update error:', pointsResponse.status, text);
+      return { 
+        success: false, 
+        error: `Points update error: ${pointsResponse.status}` 
       };
     }
 
