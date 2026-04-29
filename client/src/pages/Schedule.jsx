@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { QrCode } from 'lucide-react';
+import Loading from '../components/Loading';
 
 const API_URL = "http://localhost:8080";
 
@@ -8,16 +9,25 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/events`)
-      .then(res => res.json())
-      .then(data => {
-        setEvents(data.events || []);
-        setLoading(false);
-      })
-      .catch(err => {
+    const fetchData = async () => {
+      try {
+        const [eventsRes] = await Promise.all([
+          fetch(`${API_URL}/api/events`),
+        ]);
+
+        const [eventsData] = await Promise.all([
+          eventsRes.json(),
+        ]);
+
+        setEvents(eventsData.events || []);
+      } catch (err) {
         console.error("Error fetching events:", err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, []);
 
   const formatTime = (dateString) => {
@@ -44,13 +54,7 @@ export default function Schedule() {
     return 'event';
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading schedule...</div>
-      </div>
-    );
-  }
+  if (loading) return <Loading />;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

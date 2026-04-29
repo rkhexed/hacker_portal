@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Save, Loader2 } from 'lucide-react';
+import Loading from '../components/Loading'; 
 
 const API_URL = "http://localhost:8080";
 
@@ -26,9 +27,12 @@ export default function Profile() {
   const userEmail = "test.hacker@casehacks.ca";
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`)
-      .then(res => res.json())
-      .then(data => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        });
+        const data = await res.json();
         setUser(data.user);
         if (data.user) {
           setFormData({
@@ -43,12 +47,13 @@ export default function Profile() {
             portfolio: data.user.portfolio || '',
           });
         }
-        setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Error fetching user:", err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    fetchData();
   }, []);
 
   const handleChange = (e) => {
@@ -80,13 +85,7 @@ export default function Profile() {
     setSaving(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return <Loading />;
 
   return (
     <div className="max-w-2xl mx-auto">

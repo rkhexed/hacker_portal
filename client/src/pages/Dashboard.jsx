@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { Clock, ExternalLink, Bell, Users, CheckCircle, Trophy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
-
+import Loading from '../components/Loading'; 
 const API_URL = "http://localhost:8080";
 
 export default function Dashboard() {
+  const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
   const [user, setUser] = useState(null);
@@ -20,42 +21,46 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Fetch user data (including QR code, team, and status)
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      })
-      .then(res => res.json())
-      .then(data => {
-        setUser(data.user);
-        // If user has a team, fetch team details with members
-        if (data.user?.team_id) {
-          fetch(`${API_URL}/api/team/${data.user.team_id}`)
-            .then(res => res.json())
-            .then(teamData => setTeam(teamData.team))
-            .catch(err => console.error("Error fetching team:", err));
-        }
-        // Fetch user's check-ins
-        if (data.user?.id) {
-          fetch(`${API_URL}/api/checkins/${data.user.id}`)
-            .then(res => res.json())
-            .then(checkinData => setCheckins(checkinData.checkins || []))
-            .catch(err => console.error("Error fetching checkins:", err));
-        }
-      })
-      .catch(err => console.error("Error fetching user:", err));
+    const fetchData = async () => {
+      try {
+        // fetch user data
+        const userRes = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` }
+        });
+        const userData = await userRes.json();
+        const fetchedUser = userData.user;
+        setUser(fetchedUser);
 
-    // Fetch announcements
-    fetch(`${API_URL}/api/announcements`)
-      .then(res => res.json())
-      .then(data => setAnnouncements(data.announcements || []))
-      .catch(err => console.error("Error fetching announcements:", err));
+        // bundling all remaining calls in parallel
+        const [announcementsRes, eventsRes, teamRes, checkinRes] = await Promise.all([
+          fetch(`${API_URL}/api/announcements`),
+          fetch(`${API_URL}/api/events`),
+          fetchedUser?.team_id
+            ? fetch(`${API_URL}/api/team/${fetchedUser.team_id}`)
+            : Promise.resolve(null),
+          fetchedUser?.id
+            ? fetch(`${API_URL}/api/checkins/${fetchedUser.id}`)
+            : Promise.resolve(null),
+        ]);
 
-    // Fetch events for schedule display
-    fetch(`${API_URL}/api/events`)
-      .then(res => res.json())
-      .then(data => setEvents(data.events || []))
-      .catch(err => console.error("Error fetching events:", err));
+        const [announcementsData, eventsData, teamData, checkinData] = await Promise.all([
+          announcementsRes.json(),
+          eventsRes.json(),
+          teamRes?.json() ?? null,
+          checkinRes?.json() ?? null,
+        ]);
+
+        setAnnouncements(announcementsData.announcements || []);
+        setEvents(eventsData.events || []);
+        if (teamData) setTeam(teamData.team);
+        if (checkinData) setCheckins(checkinData.checkins || []);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
 
     // Countdown timer (TBD - will be set from backend)
     const deadline = new Date();
@@ -111,7 +116,8 @@ export default function Dashboard() {
     }
   };
 
-  return (
+  if (loading) return <Loading />;
+  return (    
     <div className="space-y-6">
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

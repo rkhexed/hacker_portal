@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Users, Search, UserPlus, Plus, Loader2, CheckCircle, Pencil, Save } from 'lucide-react';
+import Loading from '../components/Loading';
 
 const API_URL = "http://localhost:8080";
 
@@ -14,66 +15,55 @@ export default function Teams() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  // Create team form state
-  const [newTeam, setNewTeam] = useState({
-    name: '',
-    looking_for: '',
-    has_space: true
-  });
 
-  // Edit team form state
-  const [editTeam, setEditTeam] = useState({
-    name: '',
-    looking_for: '',
-    has_space: true
-  });
+  const [newTeam, setNewTeam] = useState({ name: '', looking_for: '', has_space: true });
+  const [editTeam, setEditTeam] = useState({ name: '', looking_for: '', has_space: true });
+  
 
   // For now, using test user email - replace with auth context
   const userEmail = "test.hacker@casehacks.ca";
 
-  const fetchTeams = () => {
-    fetch(`${API_URL}/api/teams/available`)
-      .then(res => res.json())
-      .then(data => {
-        setTeams(data.teams || []);
-      })
-      .catch(err => {
-        console.error("Error fetching teams:", err);
-      });
+  const fetchTeams = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/teams/available`);
+      const data = await res.json();
+      setTeams(data.teams || []);
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+    }
   };
 
-  const fetchUser = () => {
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`)
-      .then(res => res.json())
-      .then(data => {
-        setUser(data.user);
-        // If user has a team, fetch team details
-        if (data.user?.team_id) {
-          fetch(`${API_URL}/api/team/${data.user.team_id}`)
-            .then(res => res.json())
-            .then(teamData => {
-              setUserTeam(teamData.team);
-              // Initialize edit form with current team data
-              setEditTeam({
-                name: teamData.team?.name || '',
-                looking_for: teamData.team?.looking_for || '',
-                has_space: teamData.team?.has_space ?? true
-              });
-            })
-            .catch(err => console.error("Error fetching user team:", err));
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Error fetching user:", err);
-        setLoading(false);
-      });
+  const fetchUser = async () => {
+    try {
+      const userRes = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`);
+      const userData = await userRes.json();
+      const fetchedUser = userData.user;
+      setUser(fetchedUser);
+
+      if (fetchedUser?.team_id) {
+        const teamRes = await fetch(`${API_URL}/api/team/${fetchedUser.team_id}`);
+        const teamData = await teamRes.json();
+        setUserTeam(teamData.team);
+        setEditTeam({
+          name: teamData.team?.name || '',
+          looking_for: teamData.team?.looking_for || '',
+          has_space: teamData.team?.has_space ?? true,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching user:", err);
+    }
   };
 
   useEffect(() => {
-    fetchUser();
-    fetchTeams();
+    const fetchAll = async () => {
+      try {
+        await Promise.all([fetchUser(), fetchTeams()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
   }, []);
 
   const handleUpdateTeam = async (e) => {
@@ -151,13 +141,7 @@ export default function Teams() {
     team.looking_for?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading teams...</div>
-      </div>
-    );
-  }
+  if (loading) return <Loading />;
 
   return (
     <div className="space-y-6">
