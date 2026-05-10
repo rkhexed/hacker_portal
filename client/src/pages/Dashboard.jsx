@@ -17,7 +17,25 @@ export default function Dashboard() {
   const { session } = useAuth();
   
   // For now, using test user email - replace with auth context
-  const userEmail = "test.hacker@casehacks.ca";
+  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+
+  const deadline = new Date("2026-05-20T17:00:00-04:00").getTime();
+
+  const updateCountdown = () => {
+    const now = Date.now();
+    const diff = deadline - now;
+
+    if (diff <= 0) {
+      setCountdown({ hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    setCountdown({ hours, minutes, seconds });
+  };
 
   useEffect(() => {
     // Fetch user data (including QR code, team, and status)
@@ -30,6 +48,7 @@ export default function Dashboard() {
         const userData = await userRes.json();
         const fetchedUser = userData.user;
         setUser(fetchedUser);
+        //console.log("Fetched user data:", fetchedUser);
 
         // bundling all remaining calls in parallel
         const [announcementsRes, eventsRes, teamRes, checkinRes] = await Promise.all([
@@ -62,30 +81,28 @@ export default function Dashboard() {
     };
     fetchData();
 
-    // Countdown timer (TBD - will be set from backend)
-    const deadline = new Date();
-    deadline.setHours(deadline.getHours() + 48); // TBD
-
-    const timer = setInterval(() => {
-      const now = new Date();
-      const diff = deadline - now;
-      
-      if (diff <= 0) {
-        clearInterval(timer);
-        setCountdown({ hours: 0, minutes: 0, seconds: 0 });
-      } else {
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setCountdown({ hours, minutes, seconds });
-      }
-    }, 1000);
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
-  const formatCountdown = () => {
+  const formatCountdown = (targetDateTime) => {
     const pad = (n) => n.toString().padStart(2, '0');
+
+    const target = new Date(targetDateTime).getTime();
+    const now = Date.now();
+
+    let diff = Math.max(0, target - now);
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    diff %= 1000 * 60 * 60;
+
+    const minutes = Math.floor(diff / (1000 * 60));
+    diff %= 1000 * 60;
+
+    const seconds = Math.floor(diff / 1000);
+
     return `${pad(countdown.hours)}:${pad(countdown.minutes)}:${pad(countdown.seconds)}`;
   };
 
@@ -136,7 +153,7 @@ export default function Dashboard() {
             style={{ backgroundColor: 'var(--button)', color: 'var(--foreground)' }}
           >
             <Trophy className="w-4 h-4" style={{ color: '#f59e0b' }} />
-            <span>{user?.points || 0} pts</span>
+            <span>{user?.event_attendance_points + user?.user_interaction_points || 0} pts</span>
           </div>
           {/* Status Badge */}
           <div 
@@ -178,7 +195,7 @@ export default function Dashboard() {
             className="text-5xl font-mono font-bold tracking-tight"
             style={{ color: 'var(--foreground)' }}
           >
-            {formatCountdown()}
+            {formatCountdown("2026-05-20T17:00:00")}
           </div>
           <p className="mt-2 text-sm" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
             Until submission deadline

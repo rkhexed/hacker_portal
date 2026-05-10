@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, Search, UserPlus, Plus, Loader2, CheckCircle, Pencil, Save } from 'lucide-react';
 import Loading from '../components/Loading';
+import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = "http://localhost:8080";
 
@@ -15,13 +16,14 @@ export default function Teams() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { session } = useAuth();
 
   const [newTeam, setNewTeam] = useState({ name: '', looking_for: '', has_space: true });
   const [editTeam, setEditTeam] = useState({ name: '', looking_for: '', has_space: true });
   
 
   // For now, using test user email - replace with auth context
-  const userEmail = "test.hacker@casehacks.ca";
+  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
   const fetchTeams = async () => {
     try {

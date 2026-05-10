@@ -68,7 +68,7 @@ def update_user(user_id):
     try:
         data = request.get_json()
         # Only allow updating certain fields
-        allowed_fields = ['name', 'school', 'year', 'dietary', 'tshirt_size', 'github', 'linkedin', 'portfolio']
+        allowed_fields = ['name', 'school', 'dietary', 'github', 'linkedin', 'other']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         
         response = supabase.table("users").update(update_data).eq("id", user_id).execute()
@@ -85,7 +85,7 @@ def get_user_by_email(email):
         return jsonify({"user": response.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+'''
 @app.route("/api/user/<user_id>/points", methods=["POST"])
 # Removed token_required for testing purposes, can add back later
 # @token_required
@@ -106,7 +106,7 @@ def add_points(user_id):
         return jsonify({"points": new_points, "added": points_to_add})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+'''
 # ==================== TEAMS ====================
 @app.route("/api/teams", methods=["GET"])
 def get_teams():
@@ -323,6 +323,13 @@ def submit_hacker_to_hacker_scan(scanner_id):
         if not app_response.data or len(app_response.data) == 0:
             return jsonify({"error": "Failed to create hacker to hacker scan record"}), 500
 
+        
+        # Award +5 interaction points to the scanner only after confirmed successful insert
+        supabase.rpc("increment_interaction_points", {
+            "user_id": original_user_id,
+            "amount": 5
+        }).execute()
+
         # Get scanner's name for success message
         scanner = supabase.table("users").select("name").eq("id", scanner_id).single().execute()
         user_name = scanner.data.get("name", "User") if scanner.data else "User"
@@ -337,6 +344,31 @@ def submit_hacker_to_hacker_scan(scanner_id):
         if "duplicate" in str(e).lower() or "unique" in str(e).lower():
             return jsonify({"error": "You have already scanned this user"}), 409
         return jsonify({"error": str(e)}), 500
+    
+
+# ==================== LEADERBOARD ====================
+@app.route("/api/leaderboard", methods=["GET"])
+@token_required
+def get_leaderboard():
+    """Get all users ranked by points"""
+    try:
+        response = supabase.table("users") \
+            .select("id, name, email, event_attendance_points, user_interaction_points") \
+            .eq("status", "accepted") \
+            .execute()
+        
+        users = response.data
+        for u in users:
+            u["event_attendance_points"] = u.get("event_attendance_points") or 0
+            u["user_interaction_points"] = u.get("user_interaction_points") or 0
+            u["total_points"] = u["event_attendance_points"] + u["user_interaction_points"]
+        
+        users.sort(key=lambda u: u["total_points"], reverse=True)
+        
+        return jsonify({"users": users})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8080)

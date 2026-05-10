@@ -7,6 +7,7 @@ import Profile from './pages/Profile';
 import Teams from './pages/Teams';
 import Auth from './pages/Auth';
 import Scan from './pages/Scan';
+import Leaderboard from './pages/Leaderboard';
 import Application from './pages/Application';
 
 function App() {
@@ -43,6 +44,11 @@ function App() {
           <Route path="scan" element={
             <ProtectedRoute>
               <Scan />
+            </ProtectedRoute>
+          } />
+          <Route path="leaderboard" element={
+            <ProtectedRoute>
+              <Leaderboard />
             </ProtectedRoute>
           } />
         </Route>
