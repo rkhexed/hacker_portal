@@ -133,14 +133,17 @@ export default function Profile() {
                   type="text"
                   name="name"
                   value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                  disabled
+                  className="w-full px-4 py-2 rounded-lg border opacity-60 cursor-not-allowed"
                   style={{ 
-                    backgroundColor: 'var(--background)', 
+                    backgroundColor: 'var(--button)', 
                     borderColor: 'var(--border)',
                     color: 'var(--foreground)'
                   }}
                 />
+                <p className="text-xs mt-1" style={{ color: 'var(--foreground)', opacity: 0.5 }}>
+                  Name cannot be changed
+                </p>
               </div>
               
               <div>
@@ -173,13 +176,17 @@ export default function Profile() {
                   name="school"
                   value={formData.school}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                  disabled
+                  className="w-full px-4 py-2 rounded-lg border opacity-60 cursor-not-allowed"
                   style={{ 
-                    backgroundColor: 'var(--background)', 
+                    backgroundColor: 'var(--button)', 
                     borderColor: 'var(--border)',
                     color: 'var(--foreground)'
                   }}
                 />
+                <p className="text-xs mt-1" style={{ color: 'var(--foreground)', opacity: 0.5 }}>
+                  School cannot be changed
+                </p>
               </div>
 
             </div>

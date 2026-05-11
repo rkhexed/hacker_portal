@@ -12,6 +12,7 @@ const TABS = [
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
+const PAGE_SIZE = 50;
 
 export default function Leaderboard() {
   const { session } = useAuth();
@@ -20,6 +21,7 @@ export default function Leaderboard() {
   const [tab, setTab] = useState('total');
   const [userId, setUserId] = useState(null);
   const [bountiesOpen, setBountiesOpen] = useState(false);
+  const [page, setPage] = useState(0);
 
   const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
@@ -60,6 +62,12 @@ export default function Leaderboard() {
     return () => clearInterval(interval);
   }, [session]);
 
+  // helper
+  const changePage = (newPage) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const getVal = (u) => {
     if (tab === 'total') return (u.event_attendance_points || 0) + (u.user_interaction_points || 0);
     if (tab === 'event') return u.event_attendance_points || 0;
@@ -69,6 +77,8 @@ export default function Leaderboard() {
   const sorted = [...users].sort((a, b) => getVal(b) - getVal(a));
   const max = sorted.length > 0 ? getVal(sorted[0]) : 1;
   const currentUserRank = sorted.findIndex(u => u.id === userId);
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   if (loading) return <Loading />;
 
@@ -105,13 +115,13 @@ export default function Leaderboard() {
           className="p-6 rounded-xl shadow-sm"
           style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
         >
-          {/* Tab switcher + current place */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex gap-2">
+          {/* Tab switcher + top pagination + current place */}
+          <div className="flex items-center justify-between mb-6 gap-4">
+            <div className="flex gap-2 shrink-0">
               {TABS.map(t => (
                 <button
                   key={t.key}
-                  onClick={() => setTab(t.key)}
+                  onClick={() => { setTab(t.key); changePage(0); }}
                   className="px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer border-none"
                   style={{
                     backgroundColor: tab === t.key ? 'var(--primary)' : 'var(--button)',
@@ -123,10 +133,58 @@ export default function Leaderboard() {
               ))}
             </div>
 
+            {/* Top pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => changePage(Math.max(0, page - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border-none"
+                  style={{
+                    backgroundColor: 'var(--button)',
+                    color: 'var(--foreground)',
+                    opacity: page === 0 ? 0.4 : 1,
+                    cursor: page === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  ←
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => changePage(i)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border-none"
+                    style={{
+                      backgroundColor: page === i ? 'var(--primary)' : 'var(--button)',
+                      color: page === i ? 'white' : 'var(--foreground)',
+                      minWidth: 36,
+                    }}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => changePage(Math.min(totalPages - 1, page + 1))}
+                  disabled={page === totalPages - 1}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border-none"
+                  style={{
+                    backgroundColor: 'var(--button)',
+                    color: 'var(--foreground)',
+                    opacity: page === totalPages - 1 ? 0.4 : 1,
+                    cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  →
+                </button>
+              </div>
+            )}
+
             {/* Current place badge */}
             {currentUserRank !== -1 && (
               <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
                 style={{ backgroundColor: 'var(--primary)', color: 'white' }}
               >
                 <span>Your place</span>
@@ -146,7 +204,8 @@ export default function Leaderboard() {
 
           {/* Rows */}
           <div>
-            {sorted.map((u, i) => {
+            {paginated.map((u, i) => {
+              const globalIndex = page * PAGE_SIZE + i;
               const val = getVal(u);
               const pct = Math.round((val / max) * 100);
               const isCurrentUser = u.id === userId;
@@ -162,9 +221,9 @@ export default function Leaderboard() {
                 >
                   {/* Rank */}
                   <span className="text-xl text-center" style={{ minWidth: 28 }}>
-                    {i < 3
-                      ? MEDALS[i]
-                      : <span className="text-sm opacity-50" style={{ color: 'var(--foreground)' }}>{i + 1}</span>}
+                    {globalIndex < 3
+                      ? MEDALS[globalIndex]
+                      : <span className="text-sm opacity-50" style={{ color: 'var(--foreground)' }}>{globalIndex + 1}</span>}
                   </span>
 
                   {/* Avatar */}
@@ -219,6 +278,54 @@ export default function Leaderboard() {
               </p>
             )}
           </div>
+
+          {/* Bottom pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
+              <button
+                onClick={() => changePage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border-none"
+                style={{
+                  backgroundColor: 'var(--button)',
+                  color: 'var(--foreground)',
+                  opacity: page === 0 ? 0.4 : 1,
+                  cursor: page === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                ← Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => changePage(i)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border-none"
+                  style={{
+                    backgroundColor: page === i ? 'var(--primary)' : 'var(--button)',
+                    color: page === i ? 'white' : 'var(--foreground)',
+                    minWidth: 36,
+                  }}
+                >
+                  {i + 1}
+                </button>
+              ))}
+
+              <button
+                onClick={() => changePage(Math.min(totalPages - 1, page + 1))}
+                disabled={page === totalPages - 1}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border-none"
+                style={{
+                  backgroundColor: 'var(--button)',
+                  color: 'var(--foreground)',
+                  opacity: page === totalPages - 1 ? 0.4 : 1,
+                  cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ExternalLink, Bell, Users, CheckCircle, Trophy } from 'lucide-react';
+import { Clock, ExternalLink, Bell, Users, CheckCircle, Trophy, Maximize2  } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import Loading from '../components/Loading'; 
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [team, setTeam] = useState(null);
   const [checkins, setCheckins] = useState([]);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [qrFullscreen, setQrFullscreen] = useState(false);
   const { session } = useAuth();
   
   // For now, using test user email - replace with auth context
@@ -204,7 +205,7 @@ export default function Dashboard() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link 
               to="/schedule" 
-              className="text-sm font-medium px-4 py-2 rounded-lg transition-colors text-white"
+              className="text-sm font-medium px-4 py-2 rounded-lg transition-colors text-white hover:opacity-80 transition-opacity"
               style={{ backgroundColor: 'var(--primary)' }}
             >
               View Full Schedule
@@ -224,8 +225,9 @@ export default function Dashboard() {
           className="p-6 rounded-xl shadow-sm border flex flex-col items-center justify-center text-center"
           style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
         >
-          <div 
-            className="p-4 rounded-lg mb-4 bg-white"
+          <div
+            className="p-4 rounded-lg mb-1 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setQrFullscreen(true)}
           >
             {user?.id ? (
               <QRCodeSVG 
@@ -243,9 +245,18 @@ export default function Dashboard() {
           <h3 className="font-semibold text-lg" style={{ color: 'var(--foreground)' }}>
             {user?.name || "Check-in Pass"}
           </h3>
+          <div className="flex items-center justify-center gap-2 mt-1">
           <p className="text-sm" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
-            Scan at events & meals
+            Scan at events & workshops
           </p>
+          <button
+            onClick={() => setQrFullscreen(true)}
+            className="p-2 rounded-lg transition-colors hover:bg-[var(--button)]"
+            style={{ color: 'var(--primary)' }}
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        </div>
         </div>
       </div>
 
@@ -259,7 +270,7 @@ export default function Dashboard() {
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
-            Schedule
+            Upcoming Events
           </h3>
           <Link 
             to="/schedule" 
@@ -276,7 +287,7 @@ export default function Dashboard() {
           </p>
         ) : (
           <div className="space-y-3">
-            {events.slice(0, 5).map((event) => {
+            {events.filter(event => new Date(event.ends_at) >= new Date()).slice(0, 5).map((event) => {
               const startTime = new Date(event.starts_at);
               const endTime = new Date(event.ends_at);
               const now = new Date();
@@ -316,10 +327,17 @@ export default function Dashboard() {
                   )}
                   {isUpcoming && (
                     <span 
+                      className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700"
+                    >
+                      Upcoming
+                    </span>
+                  )}
+                  {!isInProgress && !isUpcoming && (
+                    <span 
                       className="text-xs px-2 py-1 rounded-full font-medium"
                       style={{ backgroundColor: 'var(--button)', color: 'var(--foreground)' }}
                     >
-                      Upcoming
+                      Completed
                     </span>
                   )}
                 </div>
@@ -378,7 +396,7 @@ export default function Dashboard() {
               </p>
               <Link 
                 to="/teams"
-                className="mt-3 inline-block text-sm font-medium px-4 py-2 rounded-lg"
+                className="mt-3 inline-block text-sm font-medium px-4 py-2 rounded-lg hover:opacity-80 transition-opacity"
                 style={{ backgroundColor: 'var(--primary)', color: 'white' }}
               >
                 Find a Team
@@ -443,6 +461,18 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {qrFullscreen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+          onClick={() => setQrFullscreen(false)}
+        >
+          <div className="p-6 rounded-2xl bg-white">
+            {user?.id && <QRCodeSVG value={user.id} size={240} level="M" fgColor="#8571b6" />}
+          </div>
+          <p className="text-white/70 text-sm">Tap anywhere to close</p>
+        </div>
+      )}
     </div>
   );
 }
