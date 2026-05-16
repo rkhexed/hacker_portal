@@ -1,9 +1,11 @@
 import React from 'react';
+import GrainBackground from './GrainBackground';
 export default function Loading() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]"
+    <div className="flex flex-col items-center justify-center min-h-[60vh] relative z-10"
       style={{ backgroundColor: 'var(--background, #f8f7fc)' }}
     >
+      <GrainBackground />
       {/* Animated ring */}
       <div className="relative w-20 h-20 mb-8">
         <div

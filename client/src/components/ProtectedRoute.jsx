@@ -5,44 +5,42 @@ import { useAuth } from '../contexts/AuthContext';
 const API_URL = "http://localhost:8080";
 
 export default function ProtectedRoute({ children, requireApplication = true }) {
-  const { user: authUser, session } = useAuth();
+  const { user: authUser, session, loading: authLoading } = useAuth(); 
   const location = useLocation();
   const [applicationUser, setApplicationUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false); 
   const [userNotFound, setUserNotFound] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth 
     if (session && authUser) {
-      fetch(`${API_URL}/api/user/email/${encodeURIComponent(authUser.email)}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+      setLoading(true);
+      fetch(`/api/user/email/${encodeURIComponent(authUser.email)}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
       })
         .then(res => {
-          if (res.status === 404 || !res.ok) {
+          if (res.status === 404) {
             setUserNotFound(true);
-            setLoading(false);
             return null;
           }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`); //non-404 error
           return res.json();
         })
         .then(data => {
-          if (data) {
-            setApplicationUser(data.user);
-          }
-          setLoading(false);
+          if (data) setApplicationUser(data.user);
         })
         .catch(err => {
           console.error("Error fetching user:", err);
-          setUserNotFound(true);
-          setLoading(false);
-        });
-    } else if (!session) {
+          setFetchError(true); // network/server error
+        })
+        .finally(() => setLoading(false));
+    } else {
       setLoading(false);
     }
-  }, [session, authUser]);
+  }, [session, authUser, authLoading]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>
@@ -50,23 +48,27 @@ export default function ProtectedRoute({ children, requireApplication = true }) 
     );
   }
 
-  if (!session) {
-    return <Navigate to="/login" />;
+  if (!session) return <Navigate to="/login" state={{ from: location }} replace />;
+
+  // fetch error
+  if (fetchError) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>
+          Something went wrong. Please refresh.
+        </div>
+      </div>
+    );
   }
 
-  // If user doesn't exist in users table, redirect to application
   if (userNotFound && location.pathname !== '/application') {
-    return <Navigate to="/application" />;
+    return <Navigate to="/application" replace />;
   }
 
-  // If on application page and requireApplication is false, allow access
-  if (!requireApplication) {
-    return children;
-  }
+  if (!requireApplication) return children;
 
-  // If user hasn't applied yet (no status field), redirect to application
   if (applicationUser && !applicationUser.status && location.pathname !== '/application') {
-    return <Navigate to="/application" />;
+    return <Navigate to="/application" replace />;
   }
 
   // Get application status styling

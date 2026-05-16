@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import Loading from '../components/Loading'; 
 import { useAuth } from '../contexts/AuthContext';
+import GrainBackground from '../components/GrainBackground';
 
 
 const API_URL = "http://localhost:8080";
@@ -22,7 +23,7 @@ export default function ScanPage() {
     const fetchData = async () => {
       try {
         // fetch user data
-        const userRes = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+        const userRes = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` }
         });
         const userData = await userRes.json();
@@ -72,7 +73,7 @@ export default function ScanPage() {
 // Make sure to do token stuff later for now just making the endpoint auto hit
   const scanUser = async (originalUserEmail: string, scannerId: string, userId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/scan/${scannerId}`, {
+      const response = await fetch(`/api/scan/${scannerId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -110,14 +111,15 @@ export default function ScanPage() {
   };
   if (loading) return <Loading />;
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative z-10">
+      <GrainBackground />
       {/* Header */}
       <header>
         <h1 className="text-4xl font-bold" style={{ color: 'var(--foreground)' }}>
-          Hacker to Hacker Scanner
+          Participant to Participant Scanner
         </h1>
         <p className="mt-1" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
-          Scan another hacker's QR code to connect.
+          Scan another participant's QR code to connect.
         </p>
       </header>
 

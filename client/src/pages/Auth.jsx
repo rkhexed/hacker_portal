@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import GrainBackground from '../components/GrainBackground';
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
@@ -9,6 +10,7 @@ export default function Auth() {
   const [mode, setMode] = useState('login');
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -46,15 +48,17 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50" style={{ backgroundColor: 'var(--background)' }}>
+    <div className="flex flex-col items-center justify-center min-h-screen" >
+      <GrainBackground />
       <div className="p-8 rounded-2xl shadow-sm max-w-md w-full" style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}>
-        <h1 className="text-2xl font-bold mb-2 text-center" style={{ color: 'var(--foreground)' }}>Hacker Portal</h1>
+        <img src="/CaseLogoMobile.png" alt="CaseHacks logo" className="mx-auto mb-4" style={{ height: 48 }} />
+        <h1 className="text-2xl font-bold mb-2 text-center" style={{ color: 'var(--foreground)' }}>Participant Portal</h1>
         <p className="mb-6 text-center" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
           {otpSent ? 'Check your email for a code' : mode === 'login' ? 'Sign in to your account' : 'Create a new account'}
         </p>
 
         {!otpSent ? (
-          <>
+          <>{/* 
             <div className="flex mb-6 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
               {['login', 'signup'].map((m) => (
                 <button
@@ -70,7 +74,7 @@ export default function Auth() {
                   {m === 'login' ? 'Login' : 'Sign Up'}
                 </button>
               ))}
-            </div>
+            </div>*/}
 
             <form onSubmit={handleSubmit}>
               {mode === 'signup' && (
@@ -116,6 +120,7 @@ export default function Auth() {
                 className="w-full p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-xl tracking-widest"
                 style={{ backgroundColor: 'var(--input)', border: '1px solid var(--border)', color: 'var(--foreground)' }}
                 type="text"
+                autoComplete="one-time-code"
                 placeholder="000000"
                 value={otp}
                 maxLength={6}

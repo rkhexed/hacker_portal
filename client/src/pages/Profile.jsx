@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { User, Save, Loader2 } from 'lucide-react';
 import Loading from '../components/Loading'; 
 import { useAuth } from '../contexts/AuthContext';
+import GrainBackground from '../components/GrainBackground';
 
-const API_URL = "http://localhost:8080";
+const API_URL = "";
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -29,7 +30,7 @@ export default function Profile() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+        const res = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` },
         });
         const data = await res.json();
@@ -65,7 +66,7 @@ export default function Profile() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${API_URL}/api/user/${user.id}`, {
+      const response = await fetch(`/api/user/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
@@ -88,7 +89,8 @@ export default function Profile() {
   if (loading) return <Loading />;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto relative z-10">
+      <GrainBackground />
       <header className="mb-8">
         <h1 className="text-4xl font-bold" style={{ color: 'var(--foreground)' }}>
           Profile Settings

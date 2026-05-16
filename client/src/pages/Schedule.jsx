@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, X, Clock, Calendar } from 'lucide-react';
 import Loading from '../components/Loading';
+import GrainBackground from '../components/GrainBackground';
 
 const API_URL = "http://localhost:8080";
 
 // ── Easy to change ──────────────────────────────────────────────
 const HACKATHON_DAYS = [
-  { label: 'Mon', date: 'May 11', iso: '2026-05-11' },
-  { label: 'Tue', date: 'May 12', iso: '2026-05-12' },
-  { label: 'Wed', date: 'May 13', iso: '2026-05-13' },
-  { label: 'Thu', date: 'May 14', iso: '2026-05-14' },
+  { label: 'Fri', date: 'May 22', iso: '2026-05-22' },
+  { label: 'Sat', date: 'May 23', iso: '2026-05-23' },
+  { label: 'Sun', date: 'May 24', iso: '2026-05-24' }
 ];
 
 const PX_PER_HOUR = 80;
-const START_HOUR  = 6 + 50 / 60; // 6:50 AM
+const START_HOUR  = 8 + 45 / 60; // 8:30 AM
 const END_HOUR    = 27;           // 3:00 AM next day
 // ────────────────────────────────────────────────────────────────
 
@@ -121,7 +121,23 @@ const formatDate = (dateString) =>
     ? new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     : '';
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// Returns YYYY-MM-DD in the user's LOCAL timezone — never UTC
+const todayISO = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Extract YYYY-MM-DD from a date string in local time
+const localDateISO = (dateString) => {
+  const d = new Date(dateString);
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 export default function Schedule() {
   const [events,        setEvents]        = useState([]);
@@ -135,7 +151,7 @@ export default function Schedule() {
   const scrollRef  = useRef(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/events`)
+    fetch(`/api/events`)
       .then((res) => res.json())
       .then((data) => setEvents(data.events || []))
       .catch((err) => console.error('Error fetching events:', err))
@@ -162,7 +178,7 @@ export default function Schedule() {
 
   const visibleEvents = events.filter((e) => {
     if (!e.starts_at) return false;
-    return new Date(e.starts_at).toLocaleDateString('en-CA') === selectedDay;
+    return localDateISO(e.starts_at) === selectedDay;
   });
 
   const isSelectedToday = selectedDay === todayISO();
@@ -173,15 +189,16 @@ export default function Schedule() {
   if (loading) return <Loading />;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 relative z-10">
+      <GrainBackground />
       <header>
         <h1 className="text-4xl font-bold" style={fgColor}>Schedule</h1>
-        <p className="mt-1" style={fgStyle(0.6)}>CaseHacks · May 11–14</p>
+        <p className="mt-1" style={fgStyle(0.6)}>CaseHacks · May 22-24</p>
       </header>
 
       {/* Day Picker */}
       <div
-        className="grid grid-cols-4 gap-2 p-2 rounded-xl"
+        className="grid grid-cols-3 gap-2 p-2 rounded-xl"
         style={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)' }}
       >
         {HACKATHON_DAYS.map((day) => {
@@ -288,17 +305,17 @@ export default function Schedule() {
                     }}
                     onClick={() => setSelectedEvent(event)}
                   >
-                    <p className="text-xs font-bold leading-tight truncate" style={textStyle}>
+                    <p className="text-xs font-bold leading-tight truncate -mt-0.25" style={textStyle}>
                       {event.title}
                     </p>
-                    {height > 36 && (
-                      <p className="text-xs mt-0.5 truncate" style={{ ...textStyle, opacity: isNow ? 0.85 : 0.55 }}>
-                        {formatTime(event.starts_at)}{event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+                    {height > 36 && event.location && event.location !== '-' && (
+                      <p className="pl-1 flex items-center gap-1 text-xs truncate" style={{ ...textStyle, opacity: isNow ? 0.75 : 0.45 }}>
+                        <MapPin className="w-3 h-3 shrink-0" />{event.location}
                       </p>
                     )}
-                    {height > 56 && event.location && (
-                      <p className="flex items-center gap-1 text-xs mt-1 truncate" style={{ ...textStyle, opacity: isNow ? 0.75 : 0.45 }}>
-                        <MapPin className="w-3 h-3 shrink-0" />{event.location}
+                    {height > 56 && (
+                      <p className="text-xs mt-1 truncate" style={{ ...textStyle, opacity: isNow ? 0.85 : 0.55 }}>
+                        {formatTime(event.starts_at)}{event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
                       </p>
                     )}
                   </div>

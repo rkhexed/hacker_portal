@@ -4,6 +4,8 @@ import { Clock, ExternalLink, Bell, Users, CheckCircle, Trophy, Maximize2  } fro
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import Loading from '../components/Loading'; 
+import GrainBackground from '../components/GrainBackground';
+
 const API_URL = "http://localhost:8080";
 
 export default function Dashboard() {
@@ -43,7 +45,7 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         // fetch user data
-        const userRes = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`, {
+        const userRes = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` }
         });
         const userData = await userRes.json();
@@ -53,13 +55,13 @@ export default function Dashboard() {
 
         // bundling all remaining calls in parallel
         const [announcementsRes, eventsRes, teamRes, checkinRes] = await Promise.all([
-          fetch(`${API_URL}/api/announcements`),
-          fetch(`${API_URL}/api/events`),
+          fetch(`/api/announcements`),
+          fetch(`/api/events`),
           fetchedUser?.team_id
-            ? fetch(`${API_URL}/api/team/${fetchedUser.team_id}`)
+            ? fetch(`/api/team/${fetchedUser.team_id}`)
             : Promise.resolve(null),
           fetchedUser?.id
-            ? fetch(`${API_URL}/api/checkins/${fetchedUser.id}`)
+            ? fetch(`/api/checkins/${fetchedUser.id}`)
             : Promise.resolve(null),
         ]);
 
@@ -136,7 +138,8 @@ export default function Dashboard() {
 
   if (loading) return <Loading />;
   return (    
-    <div className="space-y-6">
+    <div className="space-y-6 relative z-10">
+      <GrainBackground />
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -196,7 +199,7 @@ export default function Dashboard() {
             className="text-5xl font-mono font-bold tracking-tight"
             style={{ color: 'var(--foreground)' }}
           >
-            {formatCountdown("2026-05-20T17:00:00")}
+            {formatCountdown("2026-24-20T11:00:00")}
           </div>
           <p className="mt-2 text-sm" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
             Until submission deadline
@@ -211,7 +214,9 @@ export default function Dashboard() {
               View Full Schedule
             </Link>
             <a 
-              href="#" 
+              href="https://casehacks-2026.devpost.com/" 
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm font-medium px-4 py-2 rounded-lg border flex items-center transition-colors hover:bg-[var(--button)]/50"
               style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}
             >
