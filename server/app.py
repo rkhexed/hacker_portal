@@ -3,6 +3,7 @@ from flask_cors import CORS
 from supabase_client import supabase
 from auth import token_required
 import time
+from cache import cache_get, cache_set, cache_invalidate_leaderboards
 
 app = Flask(__name__)
 CORS(app)
@@ -317,6 +318,38 @@ def create_checkin():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== DASHBOARD ====================
+@app.route("/api/dashboard/<user_id>", methods=["GET"])
+@token_required
+def get_dashboard(user_id):
+    """Single endpoint: announcements + events + user checkins."""
+    try:
+        announcements_res = supabase.table("announcements") \
+            .select("*, users(name)") \
+            .order("created_at", desc=True) \
+            .limit(20) \
+            .execute()
+
+        events_res = supabase.table("events") \
+            .select("*") \
+            .order("starts_at") \
+            .execute()
+
+        checkins_res = supabase.table("checkins") \
+            .select("*, events(*)") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .limit(3) \
+            .execute()
+
+
+        return jsonify({
+            "announcements": announcements_res.data or [],
+            "events": events_res.data or [],
+            "checkins": checkins_res.data or [],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 # ==================== APPLICATION STATUS ====================
 @app.route("/api/application/<email>", methods=["GET"])
 def get_application_status(email):
@@ -396,6 +429,7 @@ def submit_application():
         return jsonify({"error": str(e)}), 500
     
 # ==================== SCAN ====================
+@token_required
 @app.route("/api/scan/<scanner_id>", methods=["POST"])
 async def submit_hacker_to_hacker_scan(scanner_id):
     """Submit table entry for a hacker to scan the qr code of another hacker with answers and update user status"""
@@ -427,7 +461,8 @@ async def submit_hacker_to_hacker_scan(scanner_id):
             "amount": 5
         }).execute()
         
-
+        #invalidate cache
+        cache_invalidate_leaderboards()
         #award scanning bounties if thresholds met
         check_and_award_bounties(user_id=original_user_id, bounty_type="scan", event_id=None)
 
@@ -452,6 +487,9 @@ async def submit_hacker_to_hacker_scan(scanner_id):
 @token_required
 def get_leaderboard():
     """Get all users ranked by points"""
+    cached = cache_get("leaderboard:individual")
+    if cached:
+        return jsonify(cached)
     try:
         response = supabase.table("users") \
             .select("id, name, email, event_attendance_points, user_interaction_points") \
@@ -465,8 +503,9 @@ def get_leaderboard():
             u["total_points"] = u["event_attendance_points"] + u["user_interaction_points"]
         
         users.sort(key=lambda u: u["total_points"], reverse=True)
-        
-        return jsonify({"users": users})
+        payload = {"users": users}
+        cache_set("leaderboard:individual", payload)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -477,6 +516,9 @@ def get_leaderboard():
 @token_required
 def get_teams_leaderboard():
     """Get all teams with aggregated points from their members"""
+    cached = cache_get("leaderboard:teams")
+    if cached:
+        return jsonify(cached)
     try:
         # Fetch all teams with their members' point fields
         response = supabase.table("teams").select(
@@ -510,8 +552,9 @@ def get_teams_leaderboard():
             })
 
         result.sort(key=lambda t: t["total_points"], reverse=True)
-
-        return jsonify({"teams": result})
+        payload = {"teams": result}
+        cache_set("leaderboard:teams", payload)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -663,6 +706,31 @@ def get_bounties(user_id):
             b["completed"] = b["id"] in completed_ids
 
         return jsonify({"bounties": bounties})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== RSVP ====================
+@app.route("/api/user/<user_id>/rsvp", methods=["POST"])
+@token_required
+def update_rsvp(user_id):
+    """Toggle a user's RSVP status (checked_rsvp true/false)"""
+    try:
+        data = request.get_json()
+        checked_rsvp = data.get("checked_rsvp")
+
+        if checked_rsvp is None or not isinstance(checked_rsvp, bool):
+            return jsonify({"error": "checked_rsvp (boolean) is required"}), 400
+
+        response = supabase.table("users") \
+            .update({"checked_rsvp": checked_rsvp}) \
+            .eq("id", user_id) \
+            .execute()
+
+        if not response.data:
+            return jsonify({"error": "User not found"}), 404
+
+        return jsonify({"checked_rsvp": response.data[0]["checked_rsvp"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

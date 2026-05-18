@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { UserProvider } from './contexts/UserContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
@@ -12,48 +14,52 @@ import Application from './pages/Application';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Auth />} />
-        <Route path="/application" element={
-          <ProtectedRoute requireApplication={false}>
-            <Application />
-          </ProtectedRoute>
-        } />
-        <Route path="/" element={<Layout />}>
-          <Route index element={ 
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="schedule" element={
-            <ProtectedRoute>
-              <Schedule />
-            </ProtectedRoute>
-          } />
-          <Route path="profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="teams" element={
-            <ProtectedRoute>
-              <Teams />
-            </ProtectedRoute>
-          } />
-          <Route path="scan" element={
-            <ProtectedRoute>
-              <Scan />
-            </ProtectedRoute>
-          } />
-          <Route path="leaderboard" element={
-            <ProtectedRoute>
-              <Leaderboard />
-            </ProtectedRoute>
-          } />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <UserProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Auth />} />
+            <Route path="/application" element={
+              <ProtectedRoute requireApplication={false}>
+                <Application />
+              </ProtectedRoute>
+            } />
+            <Route path="/" element={<Layout />}>
+              <Route index element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="schedule" element={
+                <ProtectedRoute>
+                  <Schedule />
+                </ProtectedRoute>
+              } />
+              <Route path="profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="teams" element={
+                <ProtectedRoute>
+                  <Teams />
+                </ProtectedRoute>
+              } />
+              <Route path="scan" element={
+                <ProtectedRoute>
+                  <Scan />
+                </ProtectedRoute>
+              } />
+              <Route path="leaderboard" element={
+                <ProtectedRoute>
+                  <Leaderboard />
+                </ProtectedRoute>
+              } />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </UserProvider>
+    </AuthProvider>
   );
 }
 

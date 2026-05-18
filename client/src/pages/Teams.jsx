@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   Search, 
@@ -18,14 +18,13 @@ import {
 } from 'lucide-react';
 import Loading from '../components/Loading';
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
-
-const API_URL = "http://localhost:8080";
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
   const [leaderboardTeams, setLeaderboardTeams] = useState([]);
-  const [user, setUser] = useState(null);
+  const { dbUser: user, userLoading, refetchUser } = useUser();
   const [userTeam, setUserTeam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,9 +38,6 @@ export default function Teams() {
   const [pendingInvites, setPendingInvites] = useState([]);
   const [respondingInvite, setRespondingInvite] = useState(null);
   const [sentRequests, setSentRequests] = useState(new Set());
-
-  
-
   const { session } = useAuth();
 
   const [newTeam, setNewTeam] = useState({ 
@@ -56,15 +52,15 @@ export default function Teams() {
     has_space: true 
   });
 
-  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+  const userEmail = user?.email ?? '';
 
   // Fetch helpers 
 
   const fetchTeams = async () => {
     try {
       const [teamsRes, leaderboardRes] = await Promise.all([
-        fetch(`${API_URL}/api/teams/available`),
-        fetch(`${API_URL}/api/teams/leaderboard`, {
+        fetch(`/api/teams/available`),
+        fetch(`/api/teams/leaderboard`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` }
         })
       ]);
@@ -77,36 +73,10 @@ export default function Teams() {
     }
   };
 
-  const fetchUser = async () => {
-    try {
-      const userRes = await fetch(
-        `${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`,
-        { headers: { 'Authorization': `Bearer ${session?.access_token}` } }
-      );
-      const userData = await userRes.json();
-      const fetchedUser = userData.user;
-      setUser(fetchedUser);
-
-      if (fetchedUser?.team_id) {
-        const teamRes = await fetch(`${API_URL}/api/team/${fetchedUser.team_id}`);
-        const teamData = await teamRes.json();
-        setUserTeam(teamData.team);
-        setEditTeam({
-          name: teamData.team?.name || '',
-          looking_for: teamData.team?.looking_for || '',
-          has_space: teamData.team?.has_space ?? true,
-        });
-      } else {
-        setUserTeam(null);
-      }
-    } catch (err) {
-      console.error("Error fetching user:", err);
-    }
-  };
 
   const fetchPendingInvites = async (teamId) => {
     try {
-      const res = await fetch(`${API_URL}/api/team/${teamId}/invites`, {
+      const res = await fetch(`/api/team/${teamId}/invites`, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
       });
       if (res.ok) {
@@ -119,18 +89,32 @@ export default function Teams() {
   };
 
   useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        await Promise.all([fetchUser(), fetchTeams()]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
-  }, []);
+    if (!user?.team_id) {
+      setUserTeam(null);
+      setLoading(false);
+      return;
+    }
+    fetch(`/api/team/${user.team_id}`)
+      .then(r => r.json())
+      .then(d => {
+        setUserTeam(d.team);
+        setEditTeam({
+          name: d.team?.name || '',
+          looking_for: d.team?.looking_for || '',
+          has_space: d.team?.has_space ?? true,
+        });
+      })
+      .catch(err => console.error('Error fetching team:', err))
+      .finally(() => setLoading(false));
+  }, [user?.team_id]);
 
   useEffect(() => {
-    if (userTeam) {
+    if (!user?.id) return;
+    fetchTeams()
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (userTeam?.id) {
       const isOwner = userTeam.users?.[0]?.email === userEmail;
       if (isOwner) fetchPendingInvites(userTeam.id);
     }
@@ -143,7 +127,7 @@ export default function Teams() {
     setSaving(true);
     setMessage({ type: '', text: '' });
     try {
-      const response = await fetch(`${API_URL}/api/team/${userTeam.id}`, {
+      const response = await fetch(`/api/team/${userTeam.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -154,7 +138,7 @@ export default function Teams() {
       if (response.ok) {
         setMessage({ type: 'success', text: 'Team updated successfully!' });
         setEditMode(false);
-        await Promise.all([fetchUser(), fetchTeams()]);
+        await Promise.all([refetchUser(), fetchTeams()]);
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to update team' });
@@ -172,7 +156,7 @@ export default function Teams() {
     // Name is always derived from the user's name	
     const teamName = `${user?.name || 'My'}'s Team`;
     try {
-      const response = await fetch(`${API_URL}/api/teams`, {
+      const response = await fetch(`/api/teams`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -184,7 +168,7 @@ export default function Teams() {
         setMessage({ type: 'success', text: 'Team created successfully!' });
         setNewTeam({ name: '', looking_for: '', has_space: true });
         setShowCreateForm(false);
-        await Promise.all([fetchUser(), fetchTeams()]);
+        await Promise.all([refetchUser(), fetchTeams()]);
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to create team' });
@@ -203,7 +187,7 @@ export default function Teams() {
     setLeavingTeam(true);
     setMessage({ type: '', text: '' });
     try {
-      const response = await fetch(`${API_URL}/api/user/${user.id}`, {
+      const response = await fetch(`/api/user/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +199,7 @@ export default function Teams() {
         setMessage({ type: 'success', text: 'You have left the team.' });
         setUserTeam(null);
         setPendingInvites([]);
-        await Promise.all([fetchUser(), fetchTeams()]);
+        await Promise.all([refetchUser(), fetchTeams()]);
       } else {
         setMessage({ type: 'error', text: 'Failed to leave team.' });
       }
@@ -229,7 +213,7 @@ export default function Teams() {
     if (!user?.id) return;
     setJoiningTeam(teamId);
     try {
-      const response = await fetch(`${API_URL}/api/team/${teamId}/invites`, {
+      const response = await fetch(`/api/team/${teamId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +237,7 @@ export default function Teams() {
   const handleRespondToInvite = async (inviteId, userId, action) => {
     setRespondingInvite(inviteId);
     try {
-      const response = await fetch(`${API_URL}/api/team/${userTeam.id}/invites/${inviteId}`, {
+      const response = await fetch(`/api/team/${userTeam.id}/invites/${inviteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -266,7 +250,7 @@ export default function Teams() {
           type: 'success',
           text: action === 'accept' ? 'Member added to team!' : 'Request declined.'
         });
-        await Promise.all([fetchUser(), fetchTeams(), fetchPendingInvites(userTeam.id)]);
+        await Promise.all([refetchUser(), fetchTeams(), fetchPendingInvites(userTeam.id)]);
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to respond.' });
@@ -278,18 +262,20 @@ export default function Teams() {
   };
 
   //joinable teams
-  const joinableTeams = leaderboardTeams.filter(team => {
-    const isOwnTeam = userTeam?.id === team.id;
-    const hasSpace = team.has_space === true;
-    const matchesSearch =
-      team.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.looking_for?.toLowerCase().includes(searchQuery.toLowerCase());
-    return !isOwnTeam && hasSpace && matchesSearch;
-  });
+  const joinableTeams = useMemo(() =>
+    leaderboardTeams.filter(team => {
+      const isOwnTeam = userTeam?.id === team.id;
+      const hasSpace = team.has_space === true;
+      const matchesSearch =
+        team.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        team.looking_for?.toLowerCase().includes(searchQuery.toLowerCase());
+      return !isOwnTeam && hasSpace && matchesSearch;
+    }), [leaderboardTeams, userTeam, searchQuery]
+  );
 
   const isOwner = userTeam && userTeam.users?.[0]?.email === userEmail;
 
-  if (loading) return <Loading />;
+  if (userLoading || loading) return <Loading />;
 
   return (
     <div className="space-y-6 relative z-10">

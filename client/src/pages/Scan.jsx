@@ -1,9 +1,8 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import Loading from '../components/Loading'; 
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
 
@@ -11,47 +10,27 @@ const API_URL = "http://localhost:8080";
 
 
 export default function ScanPage() {
-  const [loading, setLoading] = useState(true);
+  //const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState(null);
   const [scanCount, setScanCount] = useState(0);
   const { session } = useAuth();
-  const [userId, setUserId] = useState("ERROR");
+  const { dbUser: user, userLoading } = useUser();
+  //const [userId, setUserId] = useState(user?.id ?? null);;
 
-  useEffect(() => {
-    // Fetch user data (including QR code, team, and status)
-    const fetchData = async () => {
-      try {
-        // fetch user data
-        const userRes = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
-          headers: { 'Authorization': `Bearer ${session?.access_token}` }
-        });
-        const userData = await userRes.json();
-        const fetchedUser = userData.user;
-        setUserId(fetchedUser.id);
-      }
-      catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-      finally {
-        setLoading(false);
-      }
-    };
-    if (session) fetchData();
-    
-  }, [session]);
+
 
   // For now, using test user email - replace with auth context
-  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+  //const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
   //const userId = session?.user?.id || "09702fd8-9dab-4a86-8211-8b041d290a77"; // Replace with actual user ID from auth context
   //console.log("User ID:", userId);
-  const handleScan = async (detectedCodes: any[]) => {
+  const handleScan = async (detectedCodes) => {
     if (!scanning || detectedCodes.length === 0) return;
 
     const scannerId = detectedCodes[0].rawValue;
     setScanning(false);
 
-    const result = await scanUser(userEmail, scannerId, userId);
+    const result = await scanUser(scannerId, user?.id);
 
     if (result.success) {
       setMessage({ 
@@ -62,7 +41,8 @@ export default function ScanPage() {
     } else {
       setMessage({ 
         type: 'error', 
-        text: 'Scanning failed'
+        //replace with why it faiiled
+        text: `✗ Scanning failed: ${result.error || 'Scanning Failed'}`
       });
     }
 
@@ -71,16 +51,15 @@ export default function ScanPage() {
     }, 2000);
   };
 // Make sure to do token stuff later for now just making the endpoint auto hit
-  const scanUser = async (originalUserEmail: string, scannerId: string, userId: string) => {
+  const scanUser = async (scannerId, userId) => {
     try {
       const response = await fetch(`/api/scan/${scannerId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`, // ADD THIS
         },
-        body: JSON.stringify({
-          original_user_id: userId,
-        }),
+        body: JSON.stringify({ original_user_id: userId }),
       });
 
     // Check if response is ok and has content
@@ -109,7 +88,7 @@ export default function ScanPage() {
       throw error;
     }
   };
-  if (loading) return <Loading />;
+  if (userLoading) return <Loading />;
   return (
     <div className="space-y-6 relative z-10">
       <GrainBackground />

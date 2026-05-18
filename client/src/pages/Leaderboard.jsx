@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import Loading from '../components/Loading';
 import BountiesDrawer from '../components/BountiesDrawer';
 import GrainBackground from '../components/GrainBackground';
@@ -18,42 +19,40 @@ const PAGE_SIZE = 50;
 
 export default function Leaderboard() {
   const { session } = useAuth();
+  const { dbUser: user, userLoading } = useUser();
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('total');
-  const [userId, setUserId] = useState(null);
+  const userId = user?.id ?? null;
   const [bountiesOpen, setBountiesOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [teamsLeaderboard, setTeamsLeaderboard] = useState([]);
+  
 
-  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+  //const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
   useEffect(() => {
     if (!session) return;
 
     const fetchAll = async () => {
       try {
-        const [leaderboardRes, teamsRes, userRes] = await Promise.all([
+        const [leaderboardRes, teamsRes] = await Promise.all([
           fetch(`/api/leaderboard`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           }),
           fetch(`/api/teams/leaderboard`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           }),
-          fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          }),
         ]);
 
-        const [leaderboardData, teamsData, userData] = await Promise.all([
+        const [leaderboardData, teamsData] = await Promise.all([
           leaderboardRes.json(),
-          teamsRes.json(),
-          userRes.json(),
+          teamsRes.json()
         ]);
 
         setUsers(leaderboardData.users || []);
         setTeamsLeaderboard(teamsData.teams || []);
-        setUserId(userData.user.id);
       } catch (err) {
         console.error('Error fetching leaderboard:', err);
       } finally {
@@ -85,11 +84,25 @@ export default function Leaderboard() {
   };
 
   // Sort users based on selected tab
-  const sorted = tab !== 'team' ? [...users].sort((a, b) => getVal(b) - getVal(a)) : [];
-  const max = sorted.length > 0 ? getVal(sorted[0]) : 1;
-  const currentUserRank = sorted.findIndex(u => u.id === userId);
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const sorted = useMemo(() =>
+    tab !== 'team' ? [...users].sort((a, b) => getVal(b) - getVal(a)) : [], [users, tab]
+    );
+
+  const max = useMemo(() =>
+    sorted.length > 0 ? getVal(sorted[0]) : 1, [sorted, tab]
+    );
+
+  const currentUserRank = useMemo(() =>
+    sorted.findIndex(u => u.id === userId), [sorted, userId]
+    );
+
+  const totalPages = useMemo(() =>
+    Math.ceil(sorted.length / PAGE_SIZE), [sorted]
+    );
+
+  const paginated = useMemo(() =>
+    sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [sorted, page]
+    );
  
   // Team tab
   const activeTeams = teamsLeaderboard.filter(t => t.member_count > 0);
@@ -103,7 +116,7 @@ export default function Leaderboard() {
   };
 
 
-  if (loading) return <Loading />;
+  if (userLoading || loading) return <Loading />;
 
   return (
     <>

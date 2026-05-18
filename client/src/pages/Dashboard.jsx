@@ -5,24 +5,30 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import Loading from '../components/Loading'; 
 import GrainBackground from '../components/GrainBackground';
+import { useUser } from '../contexts/UserContext';
+
+
 
 const API_URL = "http://localhost:8080";
 
 export default function Dashboard() {
+  const { dbUser: user, userLoading, refetchUser } = useUser();
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
-  const [user, setUser] = useState(null);
+  //const [user, setUser] = useState(null);
   const [team, setTeam] = useState(null);
   const [checkins, setCheckins] = useState([]);
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [qrFullscreen, setQrFullscreen] = useState(false);
   const { session } = useAuth();
+  const [rsvp, setRsvp] = useState(null); // null = not yet loaded from user
+  const [rsvpLoading, setRsvpLoading] = useState(false);
   
   // For now, using test user email - replace with auth context
-  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+  //const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
-  const deadline = new Date("2026-05-20T17:00:00-04:00").getTime();
+  const deadline = new Date("2026-05-24T17:00:00-04:00").getTime();
 
   const updateCountdown = () => {
     const now = Date.now();
@@ -41,41 +47,25 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // Fetch user data (including QR code, team, and status)
+    if (!user) return;
     const fetchData = async () => {
       try {
-        // fetch user data
-        const userRes = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
-          headers: { 'Authorization': `Bearer ${session?.access_token}` }
-        });
-        const userData = await userRes.json();
-        const fetchedUser = userData.user;
-        setUser(fetchedUser);
-        //console.log("Fetched user data:", fetchedUser);
+        const authHeaders = { Authorization: `Bearer ${session.access_token}` };
 
-        // bundling all remaining calls in parallel
-        const [announcementsRes, eventsRes, teamRes, checkinRes] = await Promise.all([
-          fetch(`/api/announcements`),
-          fetch(`/api/events`),
-          fetchedUser?.team_id
-            ? fetch(`/api/team/${fetchedUser.team_id}`)
-            : Promise.resolve(null),
-          fetchedUser?.id
-            ? fetch(`/api/checkins/${fetchedUser.id}`)
-            : Promise.resolve(null),
-        ]);
+        // One call for announcements + events + checkins (was 3 separate calls)
+        const dashRes = await fetch(`/api/dashboard/${user.id}`, { headers: authHeaders });
+        const dashData = await dashRes.json();
 
-        const [announcementsData, eventsData, teamData, checkinData] = await Promise.all([
-          announcementsRes.json(),
-          eventsRes.json(),
-          teamRes?.json() ?? null,
-          checkinRes?.json() ?? null,
-        ]);
+        setAnnouncements(dashData.announcements || []);
+        setEvents(dashData.events || []);
+        setCheckins(dashData.checkins || []);
 
-        setAnnouncements(announcementsData.announcements || []);
-        setEvents(eventsData.events || []);
-        if (teamData) setTeam(teamData.team);
-        if (checkinData) setCheckins(checkinData.checkins || []);
+        // Team is user-specific and only needed when they're on one
+        if (user.team_id) {
+          const teamRes = await fetch(`/api/team/${user.team_id}`, { headers: authHeaders });
+          const teamData = await teamRes.json();
+          if (teamData.team) setTeam(teamData.team);
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       } finally {
@@ -88,7 +78,7 @@ export default function Dashboard() {
     const timer = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [user]);
 
   const formatCountdown = (targetDateTime) => {
     const pad = (n) => n.toString().padStart(2, '0');
@@ -136,10 +126,47 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return <Loading />;
-  return (    
+  // get rsvp state
+  useEffect(() => {
+    if (user) setRsvp(user.checked_rsvp ?? false);
+  }, [user?.id]);
+
+  const handleRsvp = async () => {
+    const next = !rsvp;
+    if (!next) {
+      // Confirm before un-RSVPing
+      const confirmed = window.confirm(
+        "Are you sure you want to cancel your RSVP? Your spot may not be guaranteed if you re-RSVP later."
+      );
+      if (!confirmed) return;
+    }
+    setRsvpLoading(true);
+    try {
+      const res = await fetch(`/api/user/${user.id}/rsvp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ checked_rsvp: next }),
+      });
+      if (res.ok) {
+        setRsvp(next);
+      } else {
+        console.error('RSVP update failed');
+      }
+    } catch (err) {
+      console.error('RSVP error:', err);
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  if (userLoading || loading) return <Loading />;
+  return (
     <div className="space-y-6 relative z-10">
       <GrainBackground />
+ 
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -151,20 +178,30 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Points Badge */}
-          <div 
+          <div
             className="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium"
             style={{ backgroundColor: 'var(--button)', color: 'var(--foreground)' }}
           >
             <Trophy className="w-4 h-4" style={{ color: '#f59e0b' }} />
-            <span>{user?.event_attendance_points + user?.user_interaction_points || 0} pts</span>
+            <span>{(user?.event_attendance_points ?? 0) + (user?.user_interaction_points ?? 0)} pts</span>
           </div>
-          {/* Status Badge */}
-          <div 
-            className={`px-4 py-2 rounded-full text-sm font-medium border ${getStatusStyle(user?.status)}`}
-          >
-            {getStatusText(user?.status)}
-          </div>
+          {user?.status === 'accepted' ? (
+            <button
+              onClick={handleRsvp}
+              disabled={rsvpLoading}
+              className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors disabled:opacity-60 ${
+                rsvp
+                  ? 'bg-green-100 text-green-700 border-green-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-green-50 hover:text-green-700 hover:border-green-200'
+              }`}
+            >
+              {rsvpLoading ? '...' : rsvp ? '✓ RSVP\'d — Click to Cancel' : '+ RSVP to Attend'}
+            </button>
+          ) : (
+            <div className={`px-4 py-2 rounded-full text-sm font-medium border ${getStatusStyle(user?.status)}`}>
+              {getStatusText(user?.status)}
+            </div>
+          )}
         </div>
       </header>
 
@@ -199,7 +236,7 @@ export default function Dashboard() {
             className="text-5xl font-mono font-bold tracking-tight"
             style={{ color: 'var(--foreground)' }}
           >
-            {formatCountdown("2026-24-20T11:00:00")}
+            {formatCountdown("2026-5-24T11:00:00")}
           </div>
           <p className="mt-2 text-sm" style={{ color: 'var(--foreground)', opacity: 0.6 }}>
             Until submission deadline

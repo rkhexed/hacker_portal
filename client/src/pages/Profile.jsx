@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { User, Save, Loader2 } from 'lucide-react';
 import Loading from '../components/Loading'; 
 import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
-const API_URL = "";
-
 export default function Profile() {
-  const [user, setUser] = useState(null);
+  //const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const { session } = useAuth();
+  const { dbUser: user, userLoading } = useUser();
   
   // Form state
   const [formData, setFormData] = useState({
@@ -25,35 +25,20 @@ export default function Profile() {
   });
 
   // For now, using test user email - replace with auth context
-  const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
+  //const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch(`/api/user/email/${encodeURIComponent(userEmail)}`, {
-          headers: { 'Authorization': `Bearer ${session?.access_token}` },
-        });
-        const data = await res.json();
-        setUser(data.user);
-        if (data.user) {
-          setFormData({
-            name: data.user.name || '',
-            email: data.user.email || '',
-            school: data.user.school || '',
-            dietary: data.user.dietary || '',
-            github: data.user.github || '',
-            linkedin: data.user.linkedin || '',
-            other: data.user.other || '',
-          });
-        }
-      } catch (err) {
-        console.error("Error fetching user:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [session]);
+    if (!user) return;
+    setFormData({
+      name: user.name || '',
+      email: user.email || '',
+      school: user.school || '',
+      dietary: user.dietary || '',
+      github: user.github || '',
+      linkedin: user.linkedin || '',
+      other: user.other || '',
+    });
+  }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -86,7 +71,7 @@ export default function Profile() {
     setSaving(false);
   };
 
-  if (loading) return <Loading />;
+  if (userLoading) return <Loading />;
 
   return (
     <div className="max-w-2xl mx-auto relative z-10">

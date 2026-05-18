@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { MapPin, X, Clock, Calendar } from 'lucide-react';
 import Loading from '../components/Loading';
 import GrainBackground from '../components/GrainBackground';
+import { useAuth } from '../contexts/AuthContext';
 
-const API_URL = "http://localhost:8080";
 
-// ── Easy to change ──────────────────────────────────────────────
 const HACKATHON_DAYS = [
   { label: 'Fri', date: 'May 22', iso: '2026-05-22' },
   { label: 'Sat', date: 'May 23', iso: '2026-05-23' },
@@ -15,13 +14,13 @@ const HACKATHON_DAYS = [
 const PX_PER_HOUR = 80;
 const START_HOUR  = 8 + 45 / 60; // 8:30 AM
 const END_HOUR    = 27;           // 3:00 AM next day
-// ────────────────────────────────────────────────────────────────
+
 
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 const GRID_HEIGHT   = (TOTAL_MINUTES / 60) * PX_PER_HOUR;
 const GAP           = 4; // px gutter between event columns
 
-// ── Style helpers ────────────────────────────────────────────────
+
 const fgStyle  = (opacity = 1)  => ({ color: 'var(--foreground)', opacity });
 const fgColor  = { color: 'var(--foreground)' };
 const hourToLabel = (h) => {
@@ -31,7 +30,7 @@ const hourToLabel = (h) => {
   if (d === 12) return '12 PM';
   return `${d - 12} PM`;
 };
-// ────────────────────────────────────────────────────────────────
+
 
 function minutesFromStart(date, startDate = null) {
   let h = date.getHours();
@@ -121,7 +120,7 @@ const formatDate = (dateString) =>
     ? new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     : '';
 
-// Returns YYYY-MM-DD in the user's LOCAL timezone — never UTC
+// Returns YYYY-MM-DD in the user's LOCAL timezone 
 const todayISO = () => {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -130,7 +129,7 @@ const todayISO = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// Extract YYYY-MM-DD from a date string in local time
+//  YYYY-MM-DD from a date string in local time
 const localDateISO = (dateString) => {
   const d = new Date(dateString);
   const yyyy = d.getFullYear();
@@ -176,13 +175,10 @@ export default function Schedule() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const visibleEvents = events.filter((e) => {
-    if (!e.starts_at) return false;
-    return localDateISO(e.starts_at) === selectedDay;
-  });
+  const visibleEvents = useMemo(() => events.filter(e => e.starts_at && localDateISO(e.starts_at) === selectedDay), [events, selectedDay]);
 
   const isSelectedToday = selectedDay === todayISO();
-  const layoutEvents    = assignColumns(visibleEvents);
+  const layoutEvents = useMemo(() => assignColumns(visibleEvents), [visibleEvents]);
   const nowTop          = clamp((minutesFromStart(now) / 60) * PX_PER_HOUR, 0, GRID_HEIGHT);
   const hourLabels      = buildHourLabels();
 
