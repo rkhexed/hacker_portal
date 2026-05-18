@@ -12,6 +12,10 @@ CORS(app)
 def hello_world():
     return jsonify({"message": "Hello from Python Backend!"})
 
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "ok"})
+
 
 # helper function
 def check_and_award_bounties(user_id, bounty_type, event_id=None):
