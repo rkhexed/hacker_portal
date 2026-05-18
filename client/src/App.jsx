@@ -14,9 +14,9 @@ import Application from './pages/Application';
 
 function App() {
   return (
-    <AuthProvider>
-      <UserProvider>
-        <BrowserRouter>
+    <BrowserRouter> {/* 1. Move Router to the top */}
+      <AuthProvider> {/* 2. Auth Context inside Router */}
+        <UserProvider> {/* 3. User Context inside Auth */}
           <Routes>
             <Route path="/login" element={<Auth />} />
             <Route path="/application" element={
@@ -57,9 +57,9 @@ function App() {
               } />
             </Route>
           </Routes>
-        </BrowserRouter>
-      </UserProvider>
-    </AuthProvider>
+        </UserProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

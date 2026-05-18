@@ -6,6 +6,21 @@ export default function ProtectedRoute({ children, requireApplication = true }) 
   const { session, loading: authLoading } = useAuth();
   const { dbUser, userLoading, fetchError } = useUser();
   const location = useLocation();
+  
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading auth...</div>
+      </div>
+    );
+  }
+
+  // Not logged in
+  //if (!session) return <Navigate to="/login" state={{ from: location }} replace />;
+  if(!session){
+    console.log("No session found, redirecting to login.");
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
   // Wait for both auth and user data to fully resolve before making any routing
   // decisions. This prevents the brief window where dbUser is null (not yet
@@ -19,8 +34,7 @@ export default function ProtectedRoute({ children, requireApplication = true }) 
     );
   }
 
-  // Not logged in
-  if (!session) return <Navigate to="/login" state={{ from: location }} replace />;
+  
 
   // Surface fetch errors rather than silently redirecting to /application
   if (fetchError) {
