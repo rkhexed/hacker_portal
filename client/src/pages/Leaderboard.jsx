@@ -61,12 +61,6 @@ export default function Leaderboard() {
     };
 
     fetchAll();
-    // refresh leaderboard every 30 seconds when tab is visible
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') fetchAll();
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [session]);
 
   // helper

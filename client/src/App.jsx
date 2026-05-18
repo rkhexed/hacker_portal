@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
+import { useUser } from './contexts/UserContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import Loading from './components/Loading';
 import Dashboard from './pages/Dashboard';
 import Schedule from './pages/Schedule';
 import Profile from './pages/Profile';
@@ -12,47 +14,76 @@ import Scan from './pages/Scan';
 import Leaderboard from './pages/Leaderboard';
 import Application from './pages/Application';
 
+const ALLOWED_EMAILS = import.meta.env.VITE_ALLOWED_EMAILS?.split(',').map(e => e.trim()) || [];
+
+function AdminGate({ children }) {
+  const { dbUser, userLoading } = useUser();
+  if (userLoading) return <Loading />;
+  if (!ALLOWED_EMAILS.includes(dbUser?.email)) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <p>Access restricted.</p>
+      </div>
+    );
+  }
+  return children;
+}
+
 function App() {
   return (
-    <BrowserRouter> {/* 1. Move Router to the top */}
-      <AuthProvider> {/* 2. Auth Context inside Router */}
-        <UserProvider> {/* 3. User Context inside Auth */}
+    <BrowserRouter>
+      <AuthProvider>
+        <UserProvider>
           <Routes>
             <Route path="/login" element={<Auth />} />
             <Route path="/application" element={
               <ProtectedRoute requireApplication={false}>
-                <Application />
+                <AdminGate>
+                  <Application />
+                </AdminGate>
               </ProtectedRoute>
             } />
             <Route path="/" element={<Layout />}>
               <Route index element={
                 <ProtectedRoute>
-                  <Dashboard />
+
+                    <Dashboard />
+
                 </ProtectedRoute>
               } />
               <Route path="schedule" element={
                 <ProtectedRoute>
-                  <Schedule />
+                  <AdminGate>
+                    <Schedule />
+                  </AdminGate>
                 </ProtectedRoute>
               } />
               <Route path="profile" element={
                 <ProtectedRoute>
-                  <Profile />
+                  <AdminGate>
+                    <Profile />
+                  </AdminGate>
                 </ProtectedRoute>
               } />
               <Route path="teams" element={
                 <ProtectedRoute>
-                  <Teams />
+                  <AdminGate>
+                    <Teams />
+                  </AdminGate>
                 </ProtectedRoute>
               } />
               <Route path="scan" element={
                 <ProtectedRoute>
-                  <Scan />
+                  <AdminGate>
+                    <Scan />
+                  </AdminGate>
                 </ProtectedRoute>
               } />
               <Route path="leaderboard" element={
                 <ProtectedRoute>
-                  <Leaderboard />
+                  <AdminGate>
+                    <Leaderboard />
+                  </AdminGate>
                 </ProtectedRoute>
               } />
             </Route>

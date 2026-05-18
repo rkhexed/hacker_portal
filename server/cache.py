@@ -7,7 +7,7 @@ redis = Redis(
     token=os.environ["UPSTASH_REDIS_REST_TOKEN"],
 )
 
-CACHE_TTL = 60  # seconds
+CACHE_TTL = 5  # seconds
 
 
 def cache_get(key: str):

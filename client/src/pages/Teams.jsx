@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Users, 
   Search, 
@@ -52,11 +53,12 @@ export default function Teams() {
     has_space: true 
   });
 
+  const location = useLocation();
   const userEmail = user?.email ?? '';
 
-  // Fetch helpers 
+  // --- Fetch helpers wrapped in useCallback to stabilize references ---
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     try {
       const [teamsRes, leaderboardRes] = await Promise.all([
         fetch(`/api/teams/available`),
@@ -71,10 +73,9 @@ export default function Teams() {
     } catch (err) {
       console.error("Error fetching teams:", err);
     }
-  };
+  }, [session?.access_token]);
 
-
-  const fetchPendingInvites = async (teamId) => {
+  const fetchPendingInvites = useCallback(async (teamId) => {
     try {
       const res = await fetch(`/api/team/${teamId}/invites`, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
@@ -86,41 +87,64 @@ export default function Teams() {
     } catch (err) {
       console.error("Error fetching invites:", err);
     }
-  };
+  }, [session?.access_token]);
 
+  // Fetch user's team whenever team_id changes (including after polling sets it)
   useEffect(() => {
     if (!user?.team_id) {
       setUserTeam(null);
       setLoading(false);
       return;
     }
+    let cancelled = false;
     fetch(`/api/team/${user.team_id}`)
       .then(r => r.json())
       .then(d => {
-        setUserTeam(d.team);
-        setEditTeam({
-          name: d.team?.name || '',
-          looking_for: d.team?.looking_for || '',
-          has_space: d.team?.has_space ?? true,
-        });
+        if (!cancelled) {
+          setUserTeam(d.team);
+          setEditTeam({
+            name: d.team?.name || '',
+            looking_for: d.team?.looking_for || '',
+            has_space: d.team?.has_space ?? true,
+          });
+        }
       })
       .catch(err => console.error('Error fetching team:', err))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [user?.team_id]);
 
+  // Fetch all teams once user is known, and re-fetch if token changes
   useEffect(() => {
     if (!user?.id) return;
-    fetchTeams()
-  }, [user?.id]);
+    fetchTeams();
+  }, [user?.id, fetchTeams]);
 
+  // Fetch pending invites when team loads — only if user is the owner
   useEffect(() => {
-    if (userTeam?.id) {
-      const isOwner = userTeam.users?.[0]?.email === userEmail;
-      if (isOwner) fetchPendingInvites(userTeam.id);
-    }
-  }, [userTeam?.id]);
+    if (!userTeam?.id || !user?.id) return;
+    const isOwner = userTeam.owner_id
+      ? userTeam.owner_id === user.id
+      : userTeam.users?.[0]?.email === userEmail;
+    if (isOwner) fetchPendingInvites(userTeam.id);
+  }, [userTeam?.id, user?.id, userEmail, fetchPendingInvites]);
 
-  // handlers
+  // Refetch when navigating back to this page — SPA routing never triggers
+  // visibilitychange since the tab stays visible, so we watch the route instead
+  useEffect(() => {
+    if (!user?.id || userTeam) return;
+    refetchUser();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll every 5s as a heartbeat while waiting to be accepted into a team
+  useEffect(() => {
+    if (!user?.id || userTeam) return;
+    const interval = setInterval(refetchUser, 5000);
+    return () => clearInterval(interval);
+  }, [user?.id, userTeam, refetchUser]);
+
+  // --- Handlers ---
 
   const handleUpdateTeam = async (e) => {
     e.preventDefault();
@@ -153,7 +177,6 @@ export default function Teams() {
     e.preventDefault();
     setCreating(true);
     setMessage({ type: '', text: '' });
-    // Name is always derived from the user's name	
     const teamName = `${user?.name || 'My'}'s Team`;
     try {
       const response = await fetch(`/api/teams`, {
@@ -261,7 +284,7 @@ export default function Teams() {
     setRespondingInvite(null);
   };
 
-  //joinable teams
+  // Joinable teams: open, not the user's own, matching search
   const joinableTeams = useMemo(() =>
     leaderboardTeams.filter(team => {
       const isOwnTeam = userTeam?.id === team.id;
@@ -273,7 +296,12 @@ export default function Teams() {
     }), [leaderboardTeams, userTeam, searchQuery]
   );
 
-  const isOwner = userTeam && userTeam.users?.[0]?.email === userEmail;
+  // FIX: use owner_id if available, fall back to array position
+  const isOwner = userTeam && (
+    userTeam.owner_id
+      ? userTeam.owner_id === user?.id
+      : userTeam.users?.[0]?.email === userEmail
+  );
 
   if (userLoading || loading) return <Loading />;
 
@@ -328,7 +356,6 @@ export default function Teams() {
             </div>
  
             <div className="flex gap-3 items-start">
-              {/* Points — only shown for your own team */}
               <div className="px-5 py-4 rounded-xl" style={{ backgroundColor: 'var(--button)' }}>
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-yellow-500" />
@@ -371,7 +398,6 @@ export default function Teams() {
           {/* EDIT MODE */}
           {editMode ? (
             <form onSubmit={handleUpdateTeam} className="space-y-4">
-              {/* Team name is fixed and cannot be changed */}
               <div
                 className="w-full px-4 py-3 rounded-xl border flex items-center gap-2"
                 style={{
@@ -423,7 +449,6 @@ export default function Teams() {
             </form>
           ) : (
             <>
-              {/* TEAM MEMBERS — full point breakdown visible to your own team only */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {userTeam.users?.map((member, index) => {
                   const total =
@@ -441,7 +466,6 @@ export default function Teams() {
                       <div className="flex justify-between items-center">
                         <div>
                           <div className="flex items-center gap-2">
-                            {/*index === 0 && <Crown className="w-4 h-4 text-yellow-500" />*/}
                             <h3 className="font-semibold" style={{ color: 'var(--foreground)' }}>
                               {member.name}
                               {member.email === userEmail && ' (You)'}
@@ -465,7 +489,6 @@ export default function Teams() {
                 })}
               </div>
  
-              {/* PENDING JOIN REQUESTS — visible to owner only */}
               {isOwner && pendingInvites.length > 0 && (
                 <div className="mt-6">
                   <div className="flex items-center gap-2 mb-3">
@@ -546,7 +569,6 @@ export default function Teams() {
             Create Team
           </h2>
           <form onSubmit={handleCreateTeam} className="space-y-4">
-            {/* Team name is fixed — shown as read-only */}
             <div
               className="w-full px-4 py-3 rounded-xl border flex items-center gap-2"
               style={{
@@ -590,7 +612,7 @@ export default function Teams() {
         </div>
       )}
  
-      {/* SEARCH — only shown when user has no team (looking to join) */}
+      {/* SEARCH — only shown when user has no team */}
       {!userTeam && (
         <>
           <div className="relative">
@@ -612,7 +634,6 @@ export default function Teams() {
             />
           </div>
  
-          {/* OPEN TEAMS LIST — only teams with has_space = true, no point details */}
           {joinableTeams.length === 0 ? (
             <div
               className="text-center py-16 rounded-2xl border"
@@ -633,7 +654,6 @@ export default function Teams() {
                     className="p-6 rounded-2xl border transition-all hover:shadow-lg"
                     style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
                   >
-                    {/* TOP — no trophy rank or points shown for other teams */}
                     <div className="mb-5">
                       <h2 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>
                         {team.name}
@@ -649,7 +669,6 @@ export default function Teams() {
                       </p>
                     </div>
  
-                    {/* MEMBERS — names only, no point details */}
                     {team.members && team.members.length > 0 && (
                       <div className="space-y-2 mb-5">
                         {team.members.map((member) => (
@@ -672,7 +691,6 @@ export default function Teams() {
                       </div>
                     )}
  
-                    {/* BUTTON */}
                     {alreadySent ? (
                       <div
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium"

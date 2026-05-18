@@ -3,7 +3,7 @@ from flask_cors import CORS
 from supabase_client import supabase
 from auth import token_required
 import time
-from cache import cache_get, cache_set, cache_invalidate_leaderboards
+#from cache import cache_get, cache_set, cache_invalidate_leaderboards
 
 app = Flask(__name__)
 CORS(app)
@@ -449,7 +449,6 @@ async def submit_hacker_to_hacker_scan(scanner_id):
             return app_response
         
         app_response = await insert_scan_record()
-        print("jkilling myself", app_response.data)
 
         if not app_response.data or len(app_response.data) == 0:
             return jsonify({"error": "Failed to create hacker to hacker scan record"}), 500
@@ -462,7 +461,7 @@ async def submit_hacker_to_hacker_scan(scanner_id):
         }).execute()
         
         #invalidate cache
-        cache_invalidate_leaderboards()
+        #cache_invalidate_leaderboards()
         #award scanning bounties if thresholds met
         check_and_award_bounties(user_id=original_user_id, bounty_type="scan", event_id=None)
 
@@ -487,9 +486,9 @@ async def submit_hacker_to_hacker_scan(scanner_id):
 @token_required
 def get_leaderboard():
     """Get all users ranked by points"""
-    cached = cache_get("leaderboard:individual")
-    if cached:
-        return jsonify(cached)
+    #cached = cache_get("leaderboard:individual")
+    #if cached:
+    #    return jsonify(cached)
     try:
         response = supabase.table("users") \
             .select("id, name, email, event_attendance_points, user_interaction_points") \
@@ -504,7 +503,7 @@ def get_leaderboard():
         
         users.sort(key=lambda u: u["total_points"], reverse=True)
         payload = {"users": users}
-        cache_set("leaderboard:individual", payload)
+        #cache_set("leaderboard:individual", payload)
         return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -516,9 +515,9 @@ def get_leaderboard():
 @token_required
 def get_teams_leaderboard():
     """Get all teams with aggregated points from their members"""
-    cached = cache_get("leaderboard:teams")
-    if cached:
-        return jsonify(cached)
+    #cached = cache_get("leaderboard:teams")
+    #if cached:
+    #    return jsonify(cached)
     try:
         # Fetch all teams with their members' point fields
         response = supabase.table("teams").select(
@@ -553,7 +552,7 @@ def get_teams_leaderboard():
 
         result.sort(key=lambda t: t["total_points"], reverse=True)
         payload = {"teams": result}
-        cache_set("leaderboard:teams", payload)
+        #cache_set("leaderboard:teams", payload)
         return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
