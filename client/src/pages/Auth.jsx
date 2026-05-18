@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import GrainBackground from '../components/GrainBackground';
 
 export default function Auth() {
@@ -11,6 +12,7 @@ export default function Auth() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   
+  //const location = useLocation();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -29,23 +31,30 @@ export default function Auth() {
   };
 
   const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'email',
-    });
-    if (error) {
-      alert(error.message);
-    } else {
-      if (mode === 'signup' && name) {
-        await supabase.auth.updateUser({ data: { name } });
-      }
-      navigate('/'); // redirect to dashboard on success
-    }
+  e.preventDefault();
+  setLoading(true);
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token: otp,
+    type: 'email',
+  });
+  
+  if (error) {
+    alert(error.message);
     setLoading(false);
-  };
+  } else {
+    if (mode === 'signup' && name) {
+      await supabase.auth.updateUser({ data: { name } });
+    }
+    
+    // Ensure Supabase client has fully registered the session locally 
+    // before cutting the cord and forcing React Router to shift views
+    const sessionCheck = await supabase.auth.getSession();
+    if (sessionCheck.data.session) {
+      navigate('/', { replace: true });
+    }
+  }
+};
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen" >
