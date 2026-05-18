@@ -1,6 +1,6 @@
 import os
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, g
 import jwt
 
 def token_required(f):
@@ -32,7 +32,7 @@ def token_required(f):
                 }
             )
             # You can optionally pass the user data to the route
-            # g.current_user = data
+            g.token_user = data
         except jwt.ExpiredSignatureError:
             print("JWT Error: Token has expired")
             return jsonify({'message': 'Token has expired'}), 401
