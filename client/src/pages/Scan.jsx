@@ -6,7 +6,7 @@ import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
 
-const API_URL = "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 
 export default function ScanPage() {
