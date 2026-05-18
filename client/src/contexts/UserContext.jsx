@@ -3,6 +3,8 @@ import { useAuth } from './AuthContext';
 
 const UserContext = createContext(null);
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+
 export function UserProvider({ children }) {
   const [dbUser, setDbUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -35,7 +37,7 @@ export function UserProvider({ children }) {
 
     try {
       const res = await fetch(
-        `/api/user/email/${encodeURIComponent(email)}`,
+        `${API_URL}/api/user/email/${encodeURIComponent(email)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(10_000),

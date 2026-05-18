@@ -16,13 +16,13 @@ export default function BountiesDrawer({ open, onClose }) {
 
     const fetchBounties = async () => {
       try {
-        const userRes = await fetch(`/api/user/email/${encodeURIComponent(session.user.email)}`, {
+        const userRes = await fetch(`${API_URL}/api/user/email/${encodeURIComponent(session.user.email)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const userData = await userRes.json();
         const userId = userData.user.id;
 
-        const bountiesRes = await fetch(`/api/bounties/${userId}`, {
+        const bountiesRes = await fetch(`${API_URL}/api/bounties/${userId}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const data = await bountiesRes.json();

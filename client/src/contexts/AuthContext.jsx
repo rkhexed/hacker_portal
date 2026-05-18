@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -28,7 +30,7 @@ export function AuthProvider({ children }) {
         
         if (userName) {
           try {
-            await fetch(`/api/user`, {
+            await fetch(`${API_URL}/api/user`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

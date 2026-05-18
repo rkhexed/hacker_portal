@@ -53,7 +53,7 @@ export default function Dashboard() {
         const authHeaders = { Authorization: `Bearer ${session.access_token}` };
 
         // One call for announcements + events + checkins (was 3 separate calls)
-        const dashRes = await fetch(`/api/dashboard/${user.id}`, { headers: authHeaders });
+        const dashRes = await fetch(`${API_URL}/api/dashboard/${user.id}`, { headers: authHeaders });
         const dashData = await dashRes.json();
 
         setAnnouncements(dashData.announcements || []);
@@ -62,7 +62,7 @@ export default function Dashboard() {
 
         // Team is user-specific and only needed when they're on one
         if (user.team_id) {
-          const teamRes = await fetch(`/api/team/${user.team_id}`, { headers: authHeaders });
+          const teamRes = await fetch(`${API_URL}/api/team/${user.team_id}`, { headers: authHeaders });
           const teamData = await teamRes.json();
           if (teamData.team) setTeam(teamData.team);
         }
@@ -142,7 +142,7 @@ export default function Dashboard() {
     }
     setRsvpLoading(true);
     try {
-      const res = await fetch(`/api/user/${user.id}/rsvp`, {
+      const res = await fetch(`${API_URL}/api/user/${user.id}/rsvp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
