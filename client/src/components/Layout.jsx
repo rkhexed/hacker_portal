@@ -1,18 +1,19 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, User, Users, Menu, LogOut, QrCode } from 'lucide-react';
+import { LayoutDashboard, Calendar, User, Users, Menu, LogOut, QrCode, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Schedule', href: '/schedule', icon: Calendar },
     { name: 'Teams', href: '/teams', icon: Users },
     { name: 'Scan', href: '/scan', icon: QrCode },
+    { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { name: 'Profile', href: '/profile', icon: User },
   ];
 
@@ -24,13 +25,12 @@ export default function Layout() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
-              <span className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
-                CaseHacks
-              </span>
+              <img src="/CaseLogo.png" alt="CaseHacks logo" className="h-12 w-auto hidden lg:block" />
+              <img src="/CaseLogoMobile.png" alt="CaseHacks logo" className="h-12 w-auto lg:hidden" />
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
+            <div className="hidden lg:flex items-center space-x-1">
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.href;
@@ -52,9 +52,13 @@ export default function Layout() {
             </div>
 
             {/* User Avatar & Sign Out */}
-            <div className="hidden md:flex items-center space-x-3">
+            <div className="hidden lg:flex items-center space-x-3">
               <div className="w-8 h-8 rounded-full bg-[var(--primary)] flex items-center justify-center text-white text-sm font-medium">
-                H
+                {/* Display first 2 letters of user's name or email as avatar*/}
+                {session?.user?.name
+                  ? session.user.name.slice(0, 2).toUpperCase()
+                  : session?.user?.email                  ? session.user.email.slice(0, 2).toUpperCase()
+                  : '??'}
               </div>
               <button
                 onClick={signOut}
@@ -68,7 +72,7 @@ export default function Layout() {
             {/* Mobile Menu Button */}
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-[var(--button)]/50 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-[var(--button)]/50 transition-colors"
               style={{ color: 'var(--foreground)' }}
             >
               <Menu className="w-6 h-6" />
@@ -78,7 +82,7 @@ export default function Layout() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-[var(--border)] bg-[var(--card)] px-4 py-3 space-y-1">
+          <div className="lg:hidden border-t border-[var(--border)] bg-[var(--card)] px-4 py-3 space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.href;

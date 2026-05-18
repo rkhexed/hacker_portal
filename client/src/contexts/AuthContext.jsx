@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
-const API_URL = "http://localhost:8080";
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
@@ -29,7 +28,7 @@ export function AuthProvider({ children }) {
         
         if (userName) {
           try {
-            await fetch(`${API_URL}/api/user`, {
+            await fetch(`/api/user`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -58,6 +57,7 @@ export function AuthProvider({ children }) {
   const value = {
     session,
     user,
+    loading,
     signOut,
   };
 

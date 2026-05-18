@@ -1,55 +1,44 @@
 import { useState, useEffect } from 'react';
 import { User, Save, Loader2 } from 'lucide-react';
-
-const API_URL = "http://localhost:8080";
+import Loading from '../components/Loading'; 
+import { useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/UserContext';
+import GrainBackground from '../components/GrainBackground';
 
 export default function Profile() {
-  const [user, setUser] = useState(null);
+  //const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const { session } = useAuth();
+  const { dbUser: user, userLoading } = useUser();
   
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     school: '',
-    year: '',
     dietary: '',
-    tshirt_size: '',
     github: '',
     linkedin: '',
-    portfolio: '',
+    other: '',
   });
 
   // For now, using test user email - replace with auth context
-  const userEmail = "test.hacker@casehacks.ca";
+  //const userEmail = session?.user?.email || "test.hacker@casehacks.ca";
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/email/${encodeURIComponent(userEmail)}`)
-      .then(res => res.json())
-      .then(data => {
-        setUser(data.user);
-        if (data.user) {
-          setFormData({
-            name: data.user.name || '',
-            email: data.user.email || '',
-            school: data.user.school || '',
-            year: data.user.year || '',
-            dietary: data.user.dietary || '',
-            tshirt_size: data.user.tshirt_size || '',
-            github: data.user.github || '',
-            linkedin: data.user.linkedin || '',
-            portfolio: data.user.portfolio || '',
-          });
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Error fetching user:", err);
-        setLoading(false);
-      });
-  }, []);
+    if (!user) return;
+    setFormData({
+      name: user.name || '',
+      email: user.email || '',
+      school: user.school || '',
+      dietary: user.dietary || '',
+      github: user.github || '',
+      linkedin: user.linkedin || '',
+      other: user.other || '',
+    });
+  }, [user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -62,9 +51,11 @@ export default function Profile() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${API_URL}/api/user/${user.id}`, {
+      const response = await fetch(`/api/user/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+         },
         body: JSON.stringify(formData),
       });
 
@@ -80,16 +71,11 @@ export default function Profile() {
     setSaving(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>
-      </div>
-    );
-  }
+  if (userLoading) return <Loading />;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto relative z-10">
+      <GrainBackground />
       <header className="mb-8">
         <h1 className="text-4xl font-bold" style={{ color: 'var(--foreground)' }}>
           Profile Settings
@@ -134,14 +120,17 @@ export default function Profile() {
                   type="text"
                   name="name"
                   value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                  disabled
+                  className="w-full px-4 py-2 rounded-lg border opacity-60 cursor-not-allowed"
                   style={{ 
-                    backgroundColor: 'var(--background)', 
+                    backgroundColor: 'var(--button)', 
                     borderColor: 'var(--border)',
                     color: 'var(--foreground)'
                   }}
                 />
+                <p className="text-xs mt-1" style={{ color: 'var(--foreground)', opacity: 0.5 }}>
+                  Name cannot be changed
+                </p>
               </div>
               
               <div>
@@ -174,39 +163,19 @@ export default function Profile() {
                   name="school"
                   value={formData.school}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                  disabled
+                  className="w-full px-4 py-2 rounded-lg border opacity-60 cursor-not-allowed"
                   style={{ 
-                    backgroundColor: 'var(--background)', 
+                    backgroundColor: 'var(--button)', 
                     borderColor: 'var(--border)',
                     color: 'var(--foreground)'
                   }}
                 />
+                <p className="text-xs mt-1" style={{ color: 'var(--foreground)', opacity: 0.5 }}>
+                  School cannot be changed
+                </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
-                  Year of Study
-                </label>
-                <select
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
-                  style={{ 
-                    backgroundColor: 'var(--background)', 
-                    borderColor: 'var(--border)',
-                    color: 'var(--foreground)'
-                  }}
-                >
-                  <option value="">Select year</option>
-                  <option value="1">1st Year</option>
-                  <option value="2">2nd Year</option>
-                  <option value="3">3rd Year</option>
-                  <option value="4">4th Year</option>
-                  <option value="5+">5+ Year</option>
-                  <option value="graduate">Graduate</option>
-                </select>
-              </div>
             </div>
           </div>
 
@@ -234,31 +203,6 @@ export default function Profile() {
                     color: 'var(--foreground)'
                   }}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
-                  T-Shirt Size
-                </label>
-                <select
-                  name="tshirt_size"
-                  value={formData.tshirt_size}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
-                  style={{ 
-                    backgroundColor: 'var(--background)', 
-                    borderColor: 'var(--border)',
-                    color: 'var(--foreground)'
-                  }}
-                >
-                  <option value="">Select size</option>
-                  <option value="XS">XS</option>
-                  <option value="S">S</option>
-                  <option value="M">M</option>
-                  <option value="L">L</option>
-                  <option value="XL">XL</option>
-                  <option value="XXL">XXL</option>
-                </select>
               </div>
             </div>
           </div>
@@ -310,12 +254,12 @@ export default function Profile() {
 
               <div>
                 <label className="block text-sm font-medium mb-1" style={{ color: 'var(--foreground)' }}>
-                  Portfolio Website
+                  Other
                 </label>
                 <input
                   type="url"
-                  name="portfolio"
-                  value={formData.portfolio}
+                  name="other"
+                  value={formData.other}
                   onChange={handleChange}
                   placeholder="https://yourwebsite.com"
                   className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
