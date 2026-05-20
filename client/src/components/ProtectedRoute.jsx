@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children, requireApplication = true }) 
   // decisions. This prevents the brief window where dbUser is null (not yet
   // fetched) from being misread as "user has no application" and bouncing the
   // user to /application unnecessarily.
-  if (authLoading || userLoading) {
+  if (userLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div style={{ color: 'var(--foreground)', opacity: 0.6 }}>Loading...</div>

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useAuth } from './AuthContext';
 
 const UserContext = createContext(null);
+const API_URL = import.meta.env.VITE_API_URL;
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 

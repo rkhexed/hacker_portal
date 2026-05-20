@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Profile() {
   //const [user, setUser] = useState(null);

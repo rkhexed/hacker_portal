@@ -22,7 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Teams() {
   const [teams, setTeams] = useState([]);
@@ -91,13 +91,31 @@ export default function Teams() {
     }
   }, [session?.access_token]);
 
+  const fetchUserTeam = useCallback(async () => {
+    if (!user?.team_id) return;
+    try {
+      const res = await fetch(`${API_URL}/api/team/${user.team_id}`);
+      const d = await res.json();
+      setUserTeam(d.team);
+      setEditTeam({
+        name: d.team?.name || '',
+        looking_for: d.team?.looking_for || '',
+        has_space: d.team?.has_space ?? true,
+      });
+    } catch (err) {
+      console.error('Error fetching team:', err);
+    }
+  }, [user?.team_id]);
+
   // Fetch user's team whenever team_id changes (including after polling sets it)
   useEffect(() => {
+
     if (!user?.team_id) {
       setUserTeam(null);
       setLoading(false);
       return;
     }
+
     let cancelled = false;
     fetch(`${API_URL}/api/team/${user.team_id}`)
       .then(r => r.json())
@@ -109,42 +127,61 @@ export default function Teams() {
             looking_for: d.team?.looking_for || '',
             has_space: d.team?.has_space ?? true,
           });
+          fetchPendingInvites(d.team?.id); // Fetch invites immediately when team loads
         }
       })
       .catch(err => console.error('Error fetching team:', err))
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [user?.team_id]);
+  }, [user?.team_id, fetchPendingInvites]);
 
   // Fetch all teams once user is known, and re-fetch if token changes
   useEffect(() => {
     if (!user?.id) return;
     fetchTeams();
-  }, [user?.id, fetchTeams]);
+  }, [user?.id]);
 
-  // Fetch pending invites when team loads — only if user is the owner
-  useEffect(() => {
+  // Fetch pending invites when team loads 
+  /*useEffect(() => {
     if (!userTeam?.id || !user?.id) return;
-    const isOwner = userTeam.owner_id
-      ? userTeam.owner_id === user.id
-      : userTeam.users?.[0]?.email === userEmail;
-    if (isOwner) fetchPendingInvites(userTeam.id);
-  }, [userTeam?.id, user?.id, userEmail, fetchPendingInvites]);
+    fetchPendingInvites(userTeam.id);
+  }, [userTeam?.id, user?.id, fetchPendingInvites]);*/
 
-  // Refetch when navigating back to this page — SPA routing never triggers
-  // visibilitychange since the tab stays visible, so we watch the route instead
+  // Refetch when navigating back to this page 
   useEffect(() => {
     if (!user?.id || userTeam) return;
     refetchUser();
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.pathname]); 
 
-  // Poll every 5s as a heartbeat while waiting to be accepted into a team
+  
+  // Poll when user HAS a team
   useEffect(() => {
-    if (!user?.id || userTeam) return;
-    const interval = setInterval(refetchUser, 5000);
+    if (!user?.id || !userTeam?.id) return;
+    //console.log('HAVE TIME');
+    const poll = async () => {
+      await Promise.all([
+        fetchPendingInvites(userTeam.id),
+        fetchUserTeam(),
+      ]);
+    };
+    const interval = setInterval(poll, 8000);
     return () => clearInterval(interval);
-  }, [user?.id, userTeam, refetchUser]);
+  }, [user?.id, userTeam?.id]);
+
+  // Poll when user has NO team
+  useEffect(() => {
+    if (!user?.id || userTeam?.id) return;
+    //console.log('NO TEAM');
+    const poll = async () => {
+      await Promise.all([
+        refetchUser(),
+        fetchTeams(),
+      ]);
+    };
+    const interval = setInterval(poll, 10000); // longer — just refreshing the browse list
+    return () => clearInterval(interval);
+  }, [user?.id, userTeam?.id]);
 
   // --- Handlers ---
 
@@ -275,7 +312,7 @@ export default function Teams() {
           type: 'success',
           text: action === 'accept' ? 'Member added to team!' : 'Request declined.'
         });
-        await Promise.all([refetchUser(), fetchTeams(), fetchPendingInvites(userTeam.id)]);
+        await Promise.all([refetchUser(), fetchTeams(), fetchPendingInvites(userTeam.id), fetchUserTeam()]);
       } else {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Failed to respond.' });
@@ -296,13 +333,6 @@ export default function Teams() {
         team.looking_for?.toLowerCase().includes(searchQuery.toLowerCase());
       return !isOwnTeam && hasSpace && matchesSearch;
     }), [leaderboardTeams, userTeam, searchQuery]
-  );
-
-  // FIX: use owner_id if available, fall back to array position
-  const isOwner = userTeam && (
-    userTeam.owner_id
-      ? userTeam.owner_id === user?.id
-      : userTeam.users?.[0]?.email === userEmail
   );
 
   if (userLoading || loading) return <Loading />;
@@ -491,7 +521,7 @@ export default function Teams() {
                 })}
               </div>
  
-              {isOwner && pendingInvites.length > 0 && (
+              {pendingInvites.length > 0 && (
                 <div className="mt-6">
                   <div className="flex items-center gap-2 mb-3">
                     <Bell className="w-4 h-4" style={{ color: 'var(--primary)' }} />

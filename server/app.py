@@ -1,9 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from supabase_client import supabase
 from auth import token_required
 import time
-#from cache import cache_get, cache_set, cache_invalidate_leaderboards
+from cache import cache_get, cache_set, cache_invalidate_leaderboard, EVENTS_TTL, ANNOUNCEMENTS_TTL, LEADERBOARD_TTL, BOUNTIES_TTL
 
 app = Flask(__name__)
 CORS(app)
@@ -61,13 +61,27 @@ def check_and_award_bounties(user_id, bounty_type, event_id=None):
 
     return
 
+#get thru THIS SLOP
+def get_current_user_id():
+    if "current_user_id" in g:
+        return g.current_user_id
+    email = g.token_user.get("email")
+    res = supabase.table("users").select("id").eq("email", email).single().execute()
+    g.current_user_id = res.data["id"] if res.data else None
+    return g.current_user_id
+
 # ==================== EVENTS / SCHEDULE ====================
 @app.route("/api/events", methods=["GET"])
 def get_events():
     """Get all events for the schedule"""
+    cached = cache_get("events")
+    if cached:
+        return jsonify(cached)
     try:
         response = supabase.table("events").select("*").order("starts_at").execute()
-        return jsonify({"events": response.data})
+        payload = {"events": response.data}
+        cache_set("events", payload, ttl=EVENTS_TTL)  #make cache 
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -101,11 +115,25 @@ def create_user():
         return jsonify({"user": response.data[0]}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/user/email/<email>", methods=["GET"])
+@token_required
+def get_user_by_email(email):
+    """Get user details by email (includes status)"""
+    if g.token_user.get("email") != email:
+        return jsonify({"error": "Unauthorized"}), 403
+    try:
+        response = supabase.table("users").select("*, teams(*)").eq("email", email).single().execute()
+        return jsonify({"user": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/user/<user_id>", methods=["GET"])
 @token_required
 def get_user(user_id):
     """Get user details by ID"""
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403 
     try:
         response = supabase.table("users").select("*, teams(*)").eq("id", user_id).single().execute()
         return jsonify({"user": response.data})
@@ -116,6 +144,8 @@ def get_user(user_id):
 @token_required
 def update_user(user_id):
     """Update user profile. If team_id is being set to null, check if the old team is now empty and archive it."""
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         data = request.get_json()
         allowed_fields = ['name', 'school', 'dietary', 'github', 'linkedin', 'other', 'team_id']
@@ -144,10 +174,21 @@ def update_user(user_id):
                 else:
                     # Decrement member count
                     supabase.rpc("decrement_team_members", {"team_id": old_team_id}).execute()
+                    # rename the team to the first user found on that team
+                    any_member = members_res.data[0]["id"]
+                    name_res = supabase.table("users").select("name") \
+                        .eq("id", any_member).single().execute()
+                    
+                    member_name = (name_res.data or {}).get("name")
+
+                    if member_name:
+                        supabase.table("teams").update({"name": f"{member_name}'s Team"}) \
+                            .eq("id", old_team_id).execute()
+                    
  
             # Cancel all pending join requests this user has sent to any team
             supabase.table("team_invites") \
-                .update({"status": "cancelled"}) \
+                .update({"status": "rejected"}) \
                 .eq("user_id", user_id) \
                 .eq("status", "pending") \
                 .execute()
@@ -156,17 +197,10 @@ def update_user(user_id):
         response = supabase.table("users").update(update_data).eq("id", user_id).execute()
         return jsonify({"user": response.data})
     except Exception as e:
+        #import traceback
+        #traceback.print_exc()
         return jsonify({"error": str(e)}), 500
  
-@app.route("/api/user/email/<email>", methods=["GET"])
-@token_required
-def get_user_by_email(email):
-    """Get user details by email (includes status)"""
-    try:
-        response = supabase.table("users").select("*, teams(*)").eq("email", email).single().execute()
-        return jsonify({"user": response.data})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
  
 '''
 @app.route("/api/user/<user_id>/points", methods=["POST"])
@@ -272,6 +306,11 @@ def get_team(team_id):
 @token_required
 def update_team(team_id):
     """Update team details"""
+
+    team_res = supabase.table("users").select("team_id").eq("id", get_current_user_id()).single().execute()
+    if (team_res.data or {}).get("team_id") != team_id:
+        return jsonify({"error": "Unauthorized"}), 403
+    
     try:
         data = request.get_json()
         # Only allow updating certain fields
@@ -287,22 +326,30 @@ def update_team(team_id):
 @app.route("/api/announcements", methods=["GET"])
 def get_announcements():
     """Get all announcements"""
+    cached = cache_get("announcements")
+    if cached:
+        return jsonify(cached)
     try:
         response = supabase.table("announcements").select("*, users(name)").order("created_at", desc=True).execute()
-        return jsonify({"announcements": response.data})
+        payload = {"announcements": response.data}
+        cache_set("announcements", payload, ttl=ANNOUNCEMENTS_TTL)
+        return jsonify(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 # ==================== CHECK-INS ====================
 @app.route("/api/checkins/<user_id>", methods=["GET"])
+@token_required
 def get_user_checkins(user_id):
     """Get all check-ins for a user"""
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         response = supabase.table("checkins").select("*, events(*)").eq("user_id", user_id).execute()
         return jsonify({"checkins": response.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+'''
 @app.route("/api/checkin", methods=["POST"])
 @token_required
 def create_checkin():
@@ -320,24 +367,32 @@ def create_checkin():
         }).execute()
         return jsonify({"checkin": response.data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500'''
 
 # ==================== DASHBOARD ====================
 @app.route("/api/dashboard/<user_id>", methods=["GET"])
 @token_required
 def get_dashboard(user_id):
     """Single endpoint: announcements + events + user checkins."""
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
-        announcements_res = supabase.table("announcements") \
-            .select("*, users(name)") \
-            .order("created_at", desc=True) \
-            .limit(20) \
-            .execute()
-
-        events_res = supabase.table("events") \
-            .select("*") \
-            .order("starts_at") \
-            .execute()
+        announcements = cache_get("announcements")
+        if announcements is None:
+            announcements_res = supabase.table("announcements") \
+                .select("*, users(name)") \
+                .order("created_at", desc=True) \
+                .limit(20) \
+                .execute()
+            cache_set("announcements", {"announcements": announcements_res.data}, ttl=ANNOUNCEMENTS_TTL)
+        
+        events = cache_get("events")
+        if events is None:
+            events_res = supabase.table("events") \
+                .select("*") \
+                .order("starts_at") \
+                .execute()
+            cache_set("events", {"events": events_res.data}, ttl=EVENTS_TTL)
 
         checkins_res = supabase.table("checkins") \
             .select("*, events(*)") \
@@ -348,16 +403,19 @@ def get_dashboard(user_id):
 
 
         return jsonify({
-            "announcements": announcements_res.data or [],
-            "events": events_res.data or [],
+            "announcements": announcements if isinstance(announcements, list) else announcements.get("announcements", []),
+            "events": events if isinstance(events, list) else events.get("events", []),
             "checkins": checkins_res.data or [],
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 # ==================== APPLICATION STATUS ====================
 @app.route("/api/application/<email>", methods=["GET"])
+@token_required
 def get_application_status(email):
     """Get application status by email"""
+    if g.token_user.get("email") != email:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         response = supabase.table("applications").select("id, email, name, status, created_at").eq("email", email).single().execute()
         return jsonify({"application": response.data})
@@ -433,29 +491,39 @@ def submit_application():
         return jsonify({"error": str(e)}), 500
     
 # ==================== SCAN ====================
-@token_required
 @app.route("/api/scan/<scanner_id>", methods=["POST"])
-async def submit_hacker_to_hacker_scan(scanner_id):
+@token_required
+def submit_hacker_to_hacker_scan(scanner_id):
     """Submit table entry for a hacker to scan the qr code of another hacker with answers and update user status"""
     try:
         data = request.get_json()
         original_user_id = data.get("original_user_id")
+
+        if get_current_user_id() != original_user_id:
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        if scanner_id == original_user_id:
+            return jsonify({"error": "You cannot scan yourself"}), 400
         
         if not original_user_id or not scanner_id:
             return jsonify({"error": "Original user ID and scanner ID are required"}), 400
         
-        async def insert_scan_record():
+        def insert_scan_record(user, scanned):
             # Create hacker to hacker scan record
             app_response = supabase.table("hacker_to_hacker_scans").insert({
-                "original_user_id": original_user_id,
-                "scanner_id": scanner_id,
+                "original_user_id": user,
+                "scanner_id": scanned,
             }).execute()
             return app_response
         
-        app_response = await insert_scan_record()
-
+        app_response = insert_scan_record(original_user_id, scanner_id)
         if not app_response.data or len(app_response.data) == 0:
             return jsonify({"error": "Failed to create hacker to hacker scan record"}), 500
+        
+
+        app_response2 = insert_scan_record(scanner_id, original_user_id)  #redo other way around
+        if not app_response2.data or len(app_response2.data) == 0:
+            return jsonify({"error": "Failed to create backward hacker to hacker scan record"}), 500
 
         
         # Award +5 interaction points to the scanner only after confirmed successful insert
@@ -463,11 +531,17 @@ async def submit_hacker_to_hacker_scan(scanner_id):
             "user_id": original_user_id,
             "amount": 5
         }).execute()
+
+        supabase.rpc("increment_interaction_points", {
+            "user_id": scanner_id,
+            "amount": 5
+        }).execute()
         
         #invalidate cache
-        #cache_invalidate_leaderboards()
+        cache_invalidate_leaderboard()
         #award scanning bounties if thresholds met
         check_and_award_bounties(user_id=original_user_id, bounty_type="scan", event_id=None)
+        check_and_award_bounties(user_id=scanner_id, bounty_type="scan", event_id=None)
 
         # Get scanner's name for success message
         scanner = supabase.table("users").select("name").eq("id", scanner_id).single().execute()
@@ -490,9 +564,10 @@ async def submit_hacker_to_hacker_scan(scanner_id):
 @token_required
 def get_leaderboard():
     """Get all users ranked by points"""
-    #cached = cache_get("leaderboard:individual")
-    #if cached:
-    #    return jsonify(cached)
+    cached = cache_get("leaderboard:individual")
+    if cached:
+        #print('hit cache')
+        return jsonify(cached)
     try:
         response = supabase.table("users") \
             .select("id, name, email, event_attendance_points, user_interaction_points") \
@@ -507,9 +582,10 @@ def get_leaderboard():
         
         users.sort(key=lambda u: u["total_points"], reverse=True)
         payload = {"users": users}
-        #cache_set("leaderboard:individual", payload)
+        cache_set("leaderboard:individual", payload, ttl=LEADERBOARD_TTL)
         return jsonify(payload)
     except Exception as e:
+        #print('error fetching leaderboard', e)
         return jsonify({"error": str(e)}), 500
 
 # ==================== TEAM LEADERBOARD ====================
@@ -568,6 +644,11 @@ def get_teams_leaderboard():
 @token_required
 def get_team_invites(team_id):
     """Get all pending join requests for a team (owner only)"""
+
+    team_res = supabase.table("users").select("team_id").eq("id", get_current_user_id()).single().execute()
+    if (team_res.data or {}).get("team_id") != team_id:
+        return jsonify({"error": "Unauthorized"}), 403
+
     try:
         response = (
             supabase.table("team_invites")
@@ -596,12 +677,15 @@ def get_team_invites(team_id):
 @token_required
 def request_join_team(team_id):
     """Send a join request to a team — upserts so users can re-apply after rejection"""
+    
     try:
         data = request.get_json()
         user_id = data.get("user_id")
 
         if not user_id:
             return jsonify({"error": "user_id is required"}), 400
+        if get_current_user_id() != user_id:
+            return jsonify({"error": "Unauthorized"}), 403
 
         # Block if already pending
         existing = (
@@ -640,7 +724,11 @@ def request_join_team(team_id):
 @app.route("/api/team/<team_id>/invites/<invite_id>", methods=["PUT"])
 @token_required
 def respond_to_invite(team_id, invite_id):
-    """Accept or reject a join request (team owner only)"""
+    """Accept or reject a join request (team member only)"""
+
+    team_res = supabase.table("users").select("team_id").eq("id", get_current_user_id()).single().execute()
+    if (team_res.data or {}).get("team_id") != team_id:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
         data = request.get_json()
         action = data.get("action")  # "accept" or "reject"
@@ -682,7 +770,7 @@ def respond_to_invite(team_id, invite_id):
 
             # Reject any other pending requests from this user on other teams
             supabase.table("team_invites").update({
-                "status": "cancelled"
+                "status": "rejected"
             }).eq("user_id", user_id).eq("status", "pending").execute()
 
         return jsonify({"success": True, "action": action})
@@ -694,8 +782,14 @@ def respond_to_invite(team_id, invite_id):
 @token_required
 def get_bounties(user_id):
     """Get all bounties with completion status for the current user"""
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
     try:
-        bounties = supabase.table("bounties").select("*").execute().data or []
+        cached_bounties = cache_get("bounties:list")
+        if cached_bounties is None:
+            cached_bounties = supabase.table("bounties").select("*").execute().data or []
+            cache_set("bounties:list", cached_bounties, ttl=BOUNTIES_TTL)
+        
 
         completed_ids = {
             r["bounty_id"] for r in
@@ -705,8 +799,7 @@ def get_bounties(user_id):
             .execute().data or []
         }
 
-        for b in bounties:
-            b["completed"] = b["id"] in completed_ids
+        bounties = [dict(b, completed=b["id"] in completed_ids) for b in cached_bounties]
 
         return jsonify({"bounties": bounties})
     except Exception as e:
@@ -717,6 +810,8 @@ def get_bounties(user_id):
 @app.route("/api/user/<user_id>/rsvp", methods=["POST"])
 @token_required
 def update_rsvp(user_id):
+    if get_current_user_id() != user_id:
+        return jsonify({"error": "Unauthorized"}), 403
     """Toggle a user's RSVP status (checked_rsvp true/false)"""
     try:
         data = request.get_json()

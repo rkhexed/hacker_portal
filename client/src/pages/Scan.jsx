@@ -6,7 +6,7 @@ import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL;
 
 
 export default function ScanPage() {
@@ -53,7 +53,7 @@ export default function ScanPage() {
 // Make sure to do token stuff later for now just making the endpoint auto hit
   const scanUser = async (scannerId, userId) => {
     try {
-      const response = await fetch(`/api/scan/${scannerId}`, {
+      const response = await fetch(`${API_URL}/api/scan/${scannerId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -65,11 +65,12 @@ export default function ScanPage() {
     // Check if response is ok and has content
     if (!response.ok) {
       const text = await response.text();
-      console.error('Server error:', response.status, text);
-      return { 
-        success: false, 
-        error: `Server error: ${response.status}` 
-      };
+      try {
+        const data = JSON.parse(text);
+        return { success: false, error: data.error || `Server error: ${response.status}` };
+      } catch {
+        return { success: false, error: `Server error: ${response.status}` };
+      }
     }
 
     // Check if response has content
