@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://casehacks-portal.onrender.com/api/health)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://hacker-portal.onrender.com/api/health)
           echo "Response status: $STATUS"
           if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
             echo "Server is alive."
