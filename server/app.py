@@ -12,6 +12,10 @@ CORS(app)
 def hello_world():
     return jsonify({"message": "Hello from Python Backend!"})
 
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "ok"})
+
 
 # helper function
 def check_and_award_bounties(user_id, bounty_type, event_id=None):
@@ -323,6 +327,8 @@ def update_team(team_id):
 def get_announcements():
     """Get all announcements"""
     cached = cache_get("announcements")
+    if cached:
+        return jsonify(cached)
     try:
         response = supabase.table("announcements").select("*, users(name)").order("created_at", desc=True).execute()
         payload = {"announcements": response.data}
@@ -371,16 +377,22 @@ def get_dashboard(user_id):
     if get_current_user_id() != user_id:
         return jsonify({"error": "Unauthorized"}), 403
     try:
-        announcements_res = supabase.table("announcements") \
-            .select("*, users(name)") \
-            .order("created_at", desc=True) \
-            .limit(20) \
-            .execute()
-
-        events_res = supabase.table("events") \
-            .select("*") \
-            .order("starts_at") \
-            .execute()
+        announcements = cache_get("announcements")
+        if announcements is None:
+            announcements_res = supabase.table("announcements") \
+                .select("*, users(name)") \
+                .order("created_at", desc=True) \
+                .limit(20) \
+                .execute()
+            cache_set("announcements", {"announcements": announcements_res.data}, ttl=ANNOUNCEMENTS_TTL)
+        
+        events = cache_get("events")
+        if events is None:
+            events_res = supabase.table("events") \
+                .select("*") \
+                .order("starts_at") \
+                .execute()
+            cache_set("events", {"events": events_res.data}, ttl=EVENTS_TTL)
 
         checkins_res = supabase.table("checkins") \
             .select("*, events(*)") \
@@ -391,8 +403,8 @@ def get_dashboard(user_id):
 
 
         return jsonify({
-            "announcements": announcements_res.data or [],
-            "events": events_res.data or [],
+            "announcements": announcements if isinstance(announcements, list) else announcements.get("announcements", []),
+            "events": events if isinstance(events, list) else events.get("events", []),
             "checkins": checkins_res.data or [],
         })
     except Exception as e:
@@ -821,4 +833,6 @@ def update_rsvp(user_id):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8080)
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False)
