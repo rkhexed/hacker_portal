@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Profile() {
   //const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export default function Profile() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`/api/user/${user.id}`, {
+      const response = await fetch(`${API_URL}/api/user/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`

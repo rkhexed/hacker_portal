@@ -5,7 +5,7 @@ import Loading from '../components/Loading';
 import BountiesDrawer from '../components/BountiesDrawer';
 import GrainBackground from '../components/GrainBackground';
 
-const API_URL = "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const TABS = [
   { key: 'total', label: 'Total' },
@@ -38,10 +38,10 @@ export default function Leaderboard() {
     const fetchAll = async () => {
       try {
         const [leaderboardRes, teamsRes] = await Promise.all([
-          fetch(`/api/leaderboard`, {
+          fetch(`${API_URL}/api/leaderboard`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           }),
-          fetch(`/api/teams/leaderboard`, {
+          fetch(`${API_URL}/api/teams/leaderboard`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           }),
         ]);

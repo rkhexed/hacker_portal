@@ -3,7 +3,7 @@ import { X, CheckCircle2, Trophy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 
-//const API_URL = "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function BountiesDrawer({ open, onClose }) {
   const drawerRef = useRef(null);
@@ -18,7 +18,7 @@ export default function BountiesDrawer({ open, onClose }) {
 
     const fetchBounties = async () => {
       try {
-        const bountiesRes = await fetch(`/api/bounties/${user.id}`, {
+        const bountiesRes = await fetch(`${API_URL}/api/bounties/${user.id}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const data = await bountiesRes.json();

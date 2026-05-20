@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
@@ -30,7 +31,7 @@ export function AuthProvider({ children }) {
         const isNewUser = session.user.created_at === session.user.last_sign_in_at;
         if (isNewUser && userName) {
           try {
-            await fetch(`/api/user`, {
+            await fetch(`${API_URL}/api/user`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

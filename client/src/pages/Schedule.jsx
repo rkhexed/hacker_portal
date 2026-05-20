@@ -4,6 +4,7 @@ import Loading from '../components/Loading';
 import GrainBackground from '../components/GrainBackground';
 import { useAuth } from '../contexts/AuthContext';
 
+const API_URL = import.meta.env.VITE_API_URL;
 
 const HACKATHON_DAYS = [
   { label: 'Fri', date: 'May 22', iso: '2026-05-22' },
@@ -150,7 +151,7 @@ export default function Schedule() {
   const scrollRef  = useRef(null);
 
   useEffect(() => {
-    fetch(`/api/events`)
+    fetch(`${API_URL}/api/events`)
       .then((res) => res.json())
       .then((data) => setEvents(data.events || []))
       .catch((err) => console.error('Error fetching events:', err))

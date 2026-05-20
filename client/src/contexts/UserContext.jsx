@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useAuth } from './AuthContext';
 
 const UserContext = createContext(null);
+const API_URL = import.meta.env.VITE_API_URL;
 
 export function UserProvider({ children }) {
   const [dbUser, setDbUser] = useState(null);
@@ -35,7 +36,7 @@ export function UserProvider({ children }) {
 
     try {
       const res = await fetch(
-        `/api/user/email/${encodeURIComponent(email)}`,
+        `${API_URL}/api/user/email/${encodeURIComponent(email)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(10_000),

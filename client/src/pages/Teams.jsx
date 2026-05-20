@@ -22,6 +22,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import GrainBackground from '../components/GrainBackground';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Teams() {
   const [teams, setTeams] = useState([]);
   const [leaderboardTeams, setLeaderboardTeams] = useState([]);
@@ -61,8 +63,8 @@ export default function Teams() {
   const fetchTeams = useCallback(async () => {
     try {
       const [teamsRes, leaderboardRes] = await Promise.all([
-        fetch(`/api/teams/available`),
-        fetch(`/api/teams/leaderboard`, {
+        fetch(`${API_URL}/api/teams/available`),
+        fetch(`${API_URL}/api/teams/leaderboard`, {
           headers: { 'Authorization': `Bearer ${session?.access_token}` }
         })
       ]);
@@ -77,7 +79,7 @@ export default function Teams() {
 
   const fetchPendingInvites = useCallback(async (teamId) => {
     try {
-      const res = await fetch(`/api/team/${teamId}/invites`, {
+      const res = await fetch(`${API_URL}/api/team/${teamId}/invites`, {
         headers: { 'Authorization': `Bearer ${session?.access_token}` }
       });
       if (res.ok) {
@@ -92,7 +94,7 @@ export default function Teams() {
   const fetchUserTeam = useCallback(async () => {
     if (!user?.team_id) return;
     try {
-      const res = await fetch(`/api/team/${user.team_id}`);
+      const res = await fetch(`${API_URL}/api/team/${user.team_id}`);
       const d = await res.json();
       setUserTeam(d.team);
       setEditTeam({
@@ -115,7 +117,7 @@ export default function Teams() {
     }
 
     let cancelled = false;
-    fetch(`/api/team/${user.team_id}`)
+    fetch(`${API_URL}/api/team/${user.team_id}`)
       .then(r => r.json())
       .then(d => {
         if (!cancelled) {
@@ -188,7 +190,7 @@ export default function Teams() {
     setSaving(true);
     setMessage({ type: '', text: '' });
     try {
-      const response = await fetch(`/api/team/${userTeam.id}`, {
+      const response = await fetch(`${API_URL}/api/team/${userTeam.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -216,7 +218,7 @@ export default function Teams() {
     setMessage({ type: '', text: '' });
     const teamName = `${user?.name || 'My'}'s Team`;
     try {
-      const response = await fetch(`/api/teams`, {
+      const response = await fetch(`${API_URL}/api/teams`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -247,7 +249,7 @@ export default function Teams() {
     setLeavingTeam(true);
     setMessage({ type: '', text: '' });
     try {
-      const response = await fetch(`/api/user/${user.id}`, {
+      const response = await fetch(`${API_URL}/api/user/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -273,7 +275,7 @@ export default function Teams() {
     if (!user?.id) return;
     setJoiningTeam(teamId);
     try {
-      const response = await fetch(`/api/team/${teamId}/invites`, {
+      const response = await fetch(`${API_URL}/api/team/${teamId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -297,7 +299,7 @@ export default function Teams() {
   const handleRespondToInvite = async (inviteId, userId, action) => {
     setRespondingInvite(inviteId);
     try {
-      const response = await fetch(`/api/team/${userTeam.id}/invites/${inviteId}`, {
+      const response = await fetch(`${API_URL}/api/team/${userTeam.id}/invites/${inviteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
