@@ -9,7 +9,7 @@ import { useUser } from '../contexts/UserContext';
 
 
 
-const API_URL = "http://localhost:8080";
+//const API_URL = "http://localhost:8080";
 
 export default function Dashboard() {
   const { dbUser: user, userLoading, refetchUser } = useUser();
@@ -46,9 +46,7 @@ export default function Dashboard() {
     setCountdown({ hours, minutes, seconds });
   };
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchData = async () => {
+  const fetchData = async () => {
       try {
         const authHeaders = { Authorization: `Bearer ${session.access_token}` };
 
@@ -72,11 +70,15 @@ export default function Dashboard() {
         setLoading(false);
       }
     };
+
+  useEffect(() => {
+    if (!user) return;
+    // call fetch api
     fetchData();
 
+    // Set up countdown timer
     updateCountdown();
     const timer = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(timer);
   }, [user]);
 

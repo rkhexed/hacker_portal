@@ -2,6 +2,9 @@ import os
 from functools import wraps
 from flask import request, jsonify, g
 import jwt
+import logging
+
+logger = logging.getLogger(__name__)
 
 def token_required(f):
     @wraps(f)
@@ -12,7 +15,8 @@ def token_required(f):
                 token = request.headers['Authorization'].split(' ')[1]
             except IndexError:
                 return jsonify({'message': 'Token format is invalid'}), 401
-
+        
+        # If the token is missing, return an error
         if not token:
             return jsonify({'message': 'Token is missing'}), 401
 
@@ -27,21 +31,35 @@ def token_required(f):
                 token, 
                 jwt_secret, 
                 algorithms=['HS256'],
+                audience='authenticated',
                 options={
-                    'verify_aud': False  # Disable audience verification for now
+                    'require': ['exp', 'iat', 'sub'],
+                    'verify_exp': True,
+                    'verify_iat': True
                 }
             )
             # You can optionally pass the user data to the route
             g.token_user = data
         except jwt.ExpiredSignatureError:
-            print("JWT Error: Token has expired")
+            logger.warning("Rejected expired JWT")
             return jsonify({'message': 'Token has expired'}), 401
-        except jwt.InvalidTokenError as e:
-            print(f"JWT Error: Token is invalid - {str(e)}")
-            return jsonify({'message': f'Token is invalid: {str(e)}'}), 401
-        except Exception as e:
-            print(f"JWT Error: Unexpected error - {str(e)}")
-            return jsonify({'message': f'Token validation error: {str(e)}'}), 401
+
+        except jwt.InvalidAudienceError:
+            logger.warning("Rejected JWT with invalid audience")
+            return jsonify({'message': 'Token is invalid'}), 401  
+
+        except jwt.MissingRequiredClaimError as e:
+            logger.warning(f"JWT missing required claim: {e.claim}")
+            return jsonify({'message': 'Token is invalid'}), 401
+
+        except jwt.InvalidTokenError:
+            logger.warning("Rejected invalid JWT", exc_info=True)
+            return jsonify({'message': 'Token is invalid'}), 401  
+
+        except Exception:
+            logger.exception("Unexpected error during JWT validation")
+            return jsonify({'message': 'Internal server error'}), 500
+        
 
         return f(*args, **kwargs)
 

@@ -53,37 +53,37 @@ function App() {
               } />
               <Route path="schedule" element={
                 <ProtectedRoute>
-                  <AdminGate>
+                  
                     <Schedule />
-                  </AdminGate>
+                  
                 </ProtectedRoute>
               } />
               <Route path="profile" element={
                 <ProtectedRoute>
-                  <AdminGate>
+                  
                     <Profile />
-                  </AdminGate>
+                  
                 </ProtectedRoute>
               } />
               <Route path="teams" element={
                 <ProtectedRoute>
-                  <AdminGate>
+                  
                     <Teams />
-                  </AdminGate>
+                  
                 </ProtectedRoute>
               } />
               <Route path="scan" element={
                 <ProtectedRoute>
-                  <AdminGate>
+                  
                     <Scan />
-                  </AdminGate>
+                  
                 </ProtectedRoute>
               } />
               <Route path="leaderboard" element={
                 <ProtectedRoute>
-                  <AdminGate>
+                  
                     <Leaderboard />
-                  </AdminGate>
+                  
                 </ProtectedRoute>
               } />
             </Route>

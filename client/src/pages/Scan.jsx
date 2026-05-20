@@ -65,11 +65,12 @@ export default function ScanPage() {
     // Check if response is ok and has content
     if (!response.ok) {
       const text = await response.text();
-      console.error('Server error:', response.status, text);
-      return { 
-        success: false, 
-        error: `Server error: ${response.status}` 
-      };
+      try {
+        const data = JSON.parse(text);
+        return { success: false, error: data.error || `Server error: ${response.status}` };
+      } catch {
+        return { success: false, error: `Server error: ${response.status}` };
+      }
     }
 
     // Check if response has content

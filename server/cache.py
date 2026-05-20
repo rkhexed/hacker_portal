@@ -7,8 +7,10 @@ redis = Redis(
     token=os.environ["UPSTASH_REDIS_REST_TOKEN"],
 )
 
-CACHE_TTL = 5  # seconds
-
+LEADERBOARD_TTL = 30   # seconds
+EVENTS_TTL      = 300  # 5 minutes
+ANNOUNCEMENTS_TTL = 600 # 10 minutes
+BOUNTIES_TTL = 3600  # 1 hr
 
 def cache_get(key: str):
     val = redis.get(key)
@@ -16,13 +18,11 @@ def cache_get(key: str):
         return None
     return json.loads(val)
 
-
-def cache_set(key: str, data, ttl: int = CACHE_TTL):
+def cache_set(key: str, data, ttl: int):
     redis.set(key, json.dumps(data), ex=ttl)
 
+def cache_invalidate_leaderboard():
+    redis.delete("leaderboard:individual")
 
-def cache_invalidate_leaderboards():
-    redis.delete("leaderboard:individual", "leaderboard:teams")
-
-def cache_invalidate_dashboard():
-    redis.delete("dashboard:announcements", "dashboard:events")
+def cache_invalidate_announcements():
+    redis.delete("announcements")

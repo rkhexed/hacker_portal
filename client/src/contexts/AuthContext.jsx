@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const getSession = async () => {
+      
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
@@ -21,12 +22,13 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(false);
 
       // Create user record in database on signup
       if (event === 'SIGNED_IN' && session?.user) {
         const userName = session.user.user_metadata?.name;
-        
-        if (userName) {
+        const isNewUser = session.user.created_at === session.user.last_sign_in_at;
+        if (isNewUser && userName) {
           try {
             await fetch(`/api/user`, {
               method: 'POST',
@@ -43,6 +45,7 @@ export function AuthProvider({ children }) {
           } catch (error) {
             console.error('Error creating user record:', error);
           }
+          
         }
       }
     });
